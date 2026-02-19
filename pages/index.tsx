@@ -1,19 +1,15 @@
-import React, { useState } from "react";
+import React from "react";
 import Head from "next/head";
 import Home from "./Home";
 import About from "./About";
 import Stats from "./Stats";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import Preloader from "@/components/Preloader";
-import TracksPage from "./Tracks";
 import FAQSection from "@/components/FaqCards";
 import Countdown from "./countdown";
 import Donors from "./Donors";
 
 export default function HackAIPage() {
-  const [loading, setLoading] = useState(true);
-
   return (
     <div className="relative">
       <Head> 
@@ -50,9 +46,6 @@ export default function HackAIPage() {
             />
           </a>
         </div>
-
-
-      {loading && <Preloader onDone={() => setLoading(false)} />}
 
 
       {/* Rest of the content */}

@@ -1,10 +1,9 @@
 import type { AppProps } from 'next/app';
-import Head from 'next/head';
 import localFont from 'next/font/local';
 import '../globals.css';
 import { useRouter } from 'next/router';
 import Preloader from '@/components/Preloader';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 const octin = localFont({
   src: [{ path: "../public/fonts/OctinSpraypaint.otf" }],
@@ -20,27 +19,26 @@ const streetFlow = localFont({
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [homePreloaderDone, setHomePreloaderDone] = useState(false);
+
+  const handlePreloaderDone = useCallback(() => {
+    setHomePreloaderDone(true);
+    const w = window as Window & { __HACKAI_PRELOADER_DONE?: boolean };
+    w.__HACKAI_PRELOADER_DONE = true;
+    window.dispatchEvent(new Event('hackai-preloader-done'));
+  }, []);
 
   useEffect(() => {
-    // Only show preloader on home page
-    if (router.pathname === '/') {
-      setLoading(true);
-      // Simulate preloader duration
-      const timer = setTimeout(() => setLoading(false), 4000);
-      return () => clearTimeout(timer);
-    } else {
-      setLoading(false);
-    }
-  }, [router.pathname]);
+    const w = window as Window & { __HACKAI_PRELOADER_DONE?: boolean };
+    w.__HACKAI_PRELOADER_DONE = homePreloaderDone;
+  }, [homePreloaderDone]);
+
+  const showPreloader = router.pathname === '/' && !homePreloaderDone;
 
   return (
     <div className={`${octin.variable} ${streetFlow.variable}`}>
-      {loading && router.pathname === '/' ? (
-        <Preloader onDone={() => setLoading(false)} />
-      ) : (
-        <Component {...pageProps} />
-      )}
+      <Component {...pageProps} />
+      {showPreloader && <Preloader onDone={handlePreloaderDone} />}
     </div>
   );
 }
