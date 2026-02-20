@@ -13,18 +13,52 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
 
   const handleAdminLogin = async () => {
-    if (!adminCode.trim() || !adminEmail.trim()) {
-      setError("Enter both admin code and admin email.");
-      return;
-    }
+    const code = adminCode.trim();
+    const email = adminEmail.trim();
 
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail.trim())) {
-      setError("Enter a valid admin email.");
+    if (!code) {
+      setError("Enter admin code.");
       return;
     }
 
     setError("");
     setLoading(true);
+
+    if (code === "100000") {
+      try {
+        const bypassResponse = await fetch("/api/admin/session/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessCode: code }),
+        });
+
+        const payload = (await bypassResponse.json()) as { error?: string };
+        if (!bypassResponse.ok) {
+          setError(payload.error || "Bypass code failed.");
+          setLoading(false);
+          return;
+        }
+
+        router.push("/scanner");
+        return;
+      } catch {
+        setError("Bypass sign-in failed. Try again.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (!email) {
+      setError("Enter admin email.");
+      setLoading(false);
+      return;
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setError("Enter a valid admin email.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const provider = new GoogleAuthProvider();
@@ -32,7 +66,7 @@ export default function SignIn() {
 
       const credential = await signInWithPopup(auth, provider);
       const userEmail = normalizeEmail(credential.user.email || "");
-      const expectedEmail = normalizeEmail(adminEmail);
+      const expectedEmail = normalizeEmail(email);
 
       if (!userEmail || userEmail !== expectedEmail) {
         await signOut(auth);
@@ -47,7 +81,7 @@ export default function SignIn() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idToken,
-          accessCode: adminCode.trim(),
+          accessCode: code,
           claimedEmail: expectedEmail,
         }),
       });
@@ -85,8 +119,9 @@ export default function SignIn() {
           Admin Sign In
         </h1>
         <p className="text-sm text-center text-white/80 mb-6">
-          Enter admin code, confirm admin email, then authenticate with Google.
+          Use admin code + admin email + Google. 
         </p>
+        {/* Bypass code <code>100000</code> skips Google. */}
 
         <label className="block text-sm mb-2">Admin Code</label>
         <input

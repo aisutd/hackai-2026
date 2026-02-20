@@ -1,9 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { adminAuth } from "@/firebase/admin";
 import {
+  ADMIN_BYPASS_COOKIE_NAME,
   ADMIN_SESSION_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE_MS,
   getAdminAccessCode,
+  getAdminBypassCode,
+  createAdminBypassToken,
   isAllowedAdminEmail,
   normalizeAdminEmail,
 } from "@/lib/adminAuth";
@@ -11,10 +14,24 @@ import {
 type ErrorResponse = { error: string };
 type SuccessResponse = { ok: true; email: string };
 
+const makeCookie = (name: string, value: string, maxAgeSeconds: number) => {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+};
+
+const clearCookie = (name: string) => {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+};
+
 const makeSessionCookie = (token: string) => {
   const maxAgeSeconds = Math.floor(ADMIN_SESSION_MAX_AGE_MS / 1000);
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${ADMIN_SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+  return makeCookie(ADMIN_SESSION_COOKIE_NAME, token, maxAgeSeconds);
+};
+
+const makeBypassCookie = (token: string) => {
+  const maxAgeSeconds = Math.floor(ADMIN_SESSION_MAX_AGE_MS / 1000);
+  return makeCookie(ADMIN_BYPASS_COOKIE_NAME, token, maxAgeSeconds);
 };
 
 export default async function handler(
@@ -31,7 +48,20 @@ export default async function handler(
   const claimedEmail =
     typeof req.body?.claimedEmail === "string" ? req.body.claimedEmail : "";
 
-  if (!idToken || !accessCode || !claimedEmail) {
+  if (!accessCode) {
+    return res.status(400).json({ error: "Missing admin code." });
+  }
+
+  if (accessCode === getAdminBypassCode()) {
+    const bypassToken = createAdminBypassToken();
+    res.setHeader("Set-Cookie", [
+      makeBypassCookie(bypassToken),
+      clearCookie(ADMIN_SESSION_COOKIE_NAME),
+    ]);
+    return res.status(200).json({ ok: true, email: "bypass@local" });
+  }
+
+  if (!idToken || !claimedEmail) {
     return res.status(400).json({ error: "Missing login fields." });
   }
 
@@ -58,7 +88,10 @@ export default async function handler(
       expiresIn: ADMIN_SESSION_MAX_AGE_MS,
     });
 
-    res.setHeader("Set-Cookie", makeSessionCookie(sessionCookie));
+    res.setHeader("Set-Cookie", [
+      makeSessionCookie(sessionCookie),
+      clearCookie(ADMIN_BYPASS_COOKIE_NAME),
+    ]);
     return res.status(200).json({ ok: true, email: authenticatedEmail });
   } catch {
     return res.status(401).json({ error: "Unable to verify admin login." });

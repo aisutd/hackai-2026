@@ -3,21 +3,16 @@ import Image from "next/image";
 import LogoScribble from "@/components/LogoScribble";
 
 const CRITICAL_HOME_ASSETS = 4;
-const SPRAY_REVEAL_MS = 1050;
 
 type HackAiWindow = Window & {
   __HACKAI_HOME_READY?: boolean;
   __HACKAI_PRELOADER_DONE?: boolean;
 };
 
-type RevealPhase = "hidden" | "spray" | "visible";
-
 export default function Home() {
-  const [revealPhase, setRevealPhase] = useState<RevealPhase>(() => {
-    if (typeof window === "undefined") return "hidden";
-    return (window as HackAiWindow).__HACKAI_PRELOADER_DONE === true
-      ? "visible"
-      : "hidden";
+  const [showHome, setShowHome] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (window as HackAiWindow).__HACKAI_PRELOADER_DONE === true;
   });
 
   const loadedAssetsRef = useRef(0);
@@ -39,33 +34,31 @@ export default function Home() {
   }, [notifyHomeReady]);
 
   useEffect(() => {
-    let revealTimer: number | null = null;
-
-    const startSprayReveal = () => {
-      setRevealPhase("spray");
-      revealTimer = window.setTimeout(() => {
-        setRevealPhase("visible");
-      }, SPRAY_REVEAL_MS);
-    };
-
-    if (!(window as HackAiWindow).__HACKAI_PRELOADER_DONE) {
-      window.addEventListener("hackai-preloader-done", startSprayReveal, {
-        once: true,
-      });
-    }
+    const onPreloaderDone = () => setShowHome(true);
+    window.addEventListener("hackai-preloader-done", onPreloaderDone, { once: true });
 
     const safetyTimer = window.setTimeout(() => notifyHomeReady(), 5000);
     return () => {
       window.clearTimeout(safetyTimer);
-      if (revealTimer) window.clearTimeout(revealTimer);
-      window.removeEventListener("hackai-preloader-done", startSprayReveal);
+      window.removeEventListener("hackai-preloader-done", onPreloaderDone);
     };
   }, [notifyHomeReady]);
 
   return (
     <div className="flex items-center w-full justify-center h-full">
       <div className="relative w-full max-w-400 h-[90vh] max-h-225">
-        <div className={`home-content ${revealPhase === "visible" ? "is-visible" : ""}`}>
+        <div className={`home-content ${showHome ? "is-visible" : ""}`}>
+          {/* <div
+            className="scribble-hint absolute left-1/2 top-1/2 z-40 pointer-events-none -translate-x-[132%] -translate-y-[103%] -rotate-12"
+          >
+            <span
+              className="rounded-full border border-white/35 bg-black/45 px-3 py-1 text-[10px] sm:text-xs uppercase tracking-wider text-white/95"
+              style={{ fontFamily: "Street Flow NYC" }}
+            >
+              Try scribbling
+            </span>
+          </div> */}
+
           <div
             className="absolute left-1/2 top-[21%] -translate-x-1/2 z-30 text-center text-white text-lg md:text-2xl leading-tight drop-shadow-[0_3px_0_rgba(0,0,0,0.9)] uppercase tracking-widest"
             style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "1px black" }}
@@ -145,15 +138,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {revealPhase === "spray" ? (
-          <div className="spray-reveal" aria-hidden>
-            <span className="spray-wash" />
-            <span className="spray-burst b1" />
-            <span className="spray-burst b2" />
-            <span className="spray-burst b3" />
-          </div>
-        ) : null}
       </div>
 
       <style jsx>{`
@@ -164,7 +148,7 @@ export default function Home() {
           opacity: 0;
           visibility: hidden;
           pointer-events: none;
-          transition: opacity 420ms ease;
+          transition: opacity 180ms ease-out;
         }
 
         .home-content.is-visible {
@@ -173,96 +157,9 @@ export default function Home() {
           pointer-events: auto;
         }
 
-        .spray-reveal {
-          position: absolute;
-          inset: -8%;
-          z-index: 70;
-          pointer-events: none;
-          overflow: hidden;
-        }
-
-        .spray-wash {
-          position: absolute;
-          inset: 0;
-          background:
-            radial-gradient(circle at 20% 58%, rgba(249, 115, 22, 0.95), transparent 26%),
-            radial-gradient(circle at 80% 42%, rgba(56, 189, 248, 0.9), transparent 24%),
-            radial-gradient(circle at 52% 52%, rgba(250, 204, 21, 0.7), transparent 35%);
-          mix-blend-mode: screen;
-          animation: spraySweep ${SPRAY_REVEAL_MS}ms cubic-bezier(0.18, 0.88, 0.22, 1) forwards;
-        }
-
-        .spray-burst {
-          position: absolute;
-          border-radius: 9999px;
-          filter: blur(1px);
-          opacity: 0;
-          animation: sprayBurst 720ms ease-out forwards;
-        }
-
-        .b1 {
-          left: 18%;
-          top: 52%;
-          width: 130px;
-          height: 95px;
-          background: rgba(249, 115, 22, 0.88);
-        }
-
-        .b2 {
-          left: 70%;
-          top: 38%;
-          width: 110px;
-          height: 84px;
-          background: rgba(56, 189, 248, 0.86);
-          animation-delay: 120ms;
-        }
-
-        .b3 {
-          left: 44%;
-          top: 56%;
-          width: 150px;
-          height: 112px;
-          background: rgba(250, 204, 21, 0.8);
-          animation-delay: 170ms;
-        }
-
-        @keyframes spraySweep {
-          0% {
-            opacity: 0;
-            clip-path: circle(3% at 18% 58%);
-            transform: scale(1.06);
-          }
-          40% {
-            opacity: 0.95;
-          }
-          100% {
-            opacity: 0;
-            clip-path: circle(140% at 50% 50%);
-            transform: scale(1);
-          }
-        }
-
-        @keyframes sprayBurst {
-          0% {
-            opacity: 0;
-            transform: scale(0.2);
-          }
-          35% {
-            opacity: 0.95;
-          }
-          100% {
-            opacity: 0;
-            transform: scale(2.2);
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .home-content {
-            transition-duration: 1ms;
-          }
-          .spray-wash,
-          .spray-burst {
-            animation-duration: 1ms !important;
+        @media (max-width: 900px) {
+          .scribble-hint {
+            transform: translateX(-118%) translateY(-95%) rotate(-10deg);
           }
         }
       `}</style>

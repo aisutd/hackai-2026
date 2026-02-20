@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 
 type PreloaderProps = {
   onDone: () => void;
@@ -11,18 +10,7 @@ type HackAiWindow = Window & {
 
 const MIN_VISIBLE_MS = 4700;
 const MAX_WAIT_MS = 14000;
-const EXIT_DURATION_MS = 1100;
-
-const PAINT_DOTS = [
-  { left: "12%", top: "28%", size: 7, delay: 400, color: "#f97316" },
-  { left: "18%", top: "34%", size: 10, delay: 500, color: "#f59e0b" },
-  { left: "81%", top: "31%", size: 8, delay: 650, color: "#38bdf8" },
-  { left: "74%", top: "40%", size: 12, delay: 760, color: "#22d3ee" },
-  { left: "23%", top: "66%", size: 8, delay: 880, color: "#eab308" },
-  { left: "70%", top: "68%", size: 11, delay: 950, color: "#fb7185" },
-  { left: "49%", top: "22%", size: 7, delay: 1120, color: "#f97316" },
-  { left: "52%", top: "75%", size: 10, delay: 1200, color: "#38bdf8" },
-];
+const EXIT_DURATION_MS = 850;
 
 export default function Preloader({ onDone }: PreloaderProps) {
   const finishedRef = useRef(false);
@@ -52,17 +40,13 @@ export default function Preloader({ onDone }: PreloaderProps) {
     const scheduleExit = () => {
       if (exitScheduled || exitingRef.current || finishedRef.current) return;
       exitScheduled = true;
-
-      // Ensure the page paints behind the preloader before we fade out.
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => beginExit());
       });
     };
 
     const maybeExit = () => {
-      if (loadReady && minReady && homeReady) {
-        scheduleExit();
-      }
+      if (loadReady && homeReady && minReady) scheduleExit();
     };
 
     const onWindowLoad = () => {
@@ -104,390 +88,222 @@ export default function Preloader({ onDone }: PreloaderProps) {
   }, [finishOnce]);
 
   return (
-    <div
-      className={`fixed inset-0 z-[9999] bg-black ${isExiting ? "is-exiting" : ""}`}
-    >
-      <div className="wall-layer absolute inset-0" />
-      <div className="handoff-layer absolute inset-0" />
+    <div className={`preloader-shell ${isExiting ? "is-exiting" : ""}`}>
+      <div className="bg-layer" />
 
-      <div className="paint-field absolute inset-0 pointer-events-none">
-        {PAINT_DOTS.map((dot, idx) => (
-          <span
-            key={`${dot.left}-${dot.top}-${idx}`}
-            className="paint-dot"
-            style={{
-              left: dot.left,
-              top: dot.top,
-              width: `${dot.size}px`,
-              height: `${dot.size}px`,
-              animationDelay: `${dot.delay}ms`,
-              background: dot.color,
-            }}
-          />
-        ))}
-      </div>
+      <main className="scene" aria-label="Loading">
+        <section className="copy-wrap">
+          <h1 className="line l1">STEP INTO</h1>
+          <h2 className="line l2">THE WORLD OF</h2>
+          <h3 className="line gradient-line">
+            <span>ARTIFICIAL</span>
+            <span className="star">✦</span>
+            <span>INTELLIGENCE</span>
+          </h3>
+        </section>
 
-      <div className="preloader-scene relative z-10 flex h-full items-center justify-center px-6">
-        <div className="w-full max-w-5xl">
-          <div className="center-stage">
-            <div className="scribble-wrap">
-              <svg
-                className="scribble-svg"
-                viewBox="0 0 980 290"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden
-              >
-                <path
-                  className="scribble s1"
-                  d="M18 168 C102 38 222 254 342 142 C428 57 510 212 618 124 C742 18 862 228 962 110"
-                />
-                <path
-                  className="scribble s2"
-                  d="M30 206 C138 100 236 272 354 188 C472 108 590 282 708 176 C818 84 898 240 952 208"
-                />
-                <path
-                  className="scribble s3"
-                  d="M56 96 C180 24 272 176 400 106 C534 34 648 178 794 104 C872 66 934 124 972 90"
-                />
-                <path className="paint-drip d1" d="M318 186 v34" />
-                <path className="paint-drip d2" d="M624 148 v42" />
-                <path className="paint-drip d3" d="M806 118 v36" />
-              </svg>
-            </div>
-
-            <div className="logo-wrap">
-              <div className="logo-shield" aria-hidden />
-              <Image
-                src="/Home/ais_logo_white.png"
-                alt="HackAI 2026"
-                width={640}
-                height={200}
-                priority
-                className="logo-image h-auto w-[min(90vw,620px)]"
-              />
-            </div>
-          </div>
-
-          <div className="hud">
-            <p className="status-copy">Spraying the wall...</p>
-            <div className="progress-track" aria-hidden>
-              <span className="progress-fill" />
-            </div>
-          </div>
+        <div className="progress-squiggle" aria-hidden>
+          <svg viewBox="0 0 1260 140" className="squiggle-svg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="squiggleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#ff2f8f" />
+                <stop offset="35%" stopColor="#ffd938" />
+                <stop offset="68%" stopColor="#9cfb2d" />
+                <stop offset="100%" stopColor="#3a67ff" />
+              </linearGradient>
+            </defs>
+            <path
+              className="squiggle-track"
+              d="M10 90 C 90 15, 170 130, 250 62 C 320 6, 390 122, 470 68 C 560 8, 640 124, 720 56 C 805 5, 885 118, 965 62 C 1048 12, 1132 116, 1250 70"
+            />
+            <path
+              pathLength={1000}
+              className="squiggle-fill"
+              d="M10 90 C 90 15, 170 130, 250 62 C 320 6, 390 122, 470 68 C 560 8, 640 124, 720 56 C 805 5, 885 118, 965 62 C 1048 12, 1132 116, 1250 70"
+            />
+          </svg>
         </div>
-      </div>
+      </main>
 
       <style jsx>{`
-        .preloader-scene {
-          transition: opacity ${EXIT_DURATION_MS}ms ease, transform ${EXIT_DURATION_MS}ms ease;
+        .preloader-shell {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          overflow: hidden;
         }
 
-        .is-exiting .preloader-scene {
-          opacity: 0;
-          transform: scale(1.01);
-        }
-
-        .wall-layer {
-          background:
-            radial-gradient(circle at 12% 16%, rgba(249, 115, 22, 0.22), transparent 28%),
-            radial-gradient(circle at 84% 24%, rgba(56, 189, 248, 0.2), transparent 24%),
-            radial-gradient(circle at 45% 90%, rgba(250, 204, 21, 0.16), transparent 25%),
-            linear-gradient(145deg, #050505 0%, #0b0b0b 50%, #080808 100%);
-          animation: wallDrift 9s ease-in-out infinite alternate;
-          transition: filter ${EXIT_DURATION_MS}ms ease, opacity ${EXIT_DURATION_MS}ms ease;
-        }
-
-        .is-exiting .wall-layer {
-          opacity: 0.3;
-          filter: saturate(0.75) brightness(0.85);
-        }
-
-        .handoff-layer {
-          opacity: 0;
-          background:
-            radial-gradient(circle at 12% 24%, rgba(249, 115, 22, 0.52), transparent 35%),
-            radial-gradient(circle at 86% 18%, rgba(56, 189, 248, 0.44), transparent 34%),
-            radial-gradient(circle at 48% 88%, rgba(250, 204, 21, 0.24), transparent 40%),
-            linear-gradient(120deg, rgba(249, 115, 22, 0.42) 0%, rgba(250, 204, 21, 0.26) 38%, rgba(56, 189, 248, 0.42) 72%, rgba(3, 7, 18, 0.48) 100%),
-            url("/mainbg.svg");
-          background-size: 200% 200%, 180% 180%, 220% 220%, 240% 240%, cover;
-          background-position: 0% 50%, 100% 10%, 50% 100%, 0% 50%, center;
-          background-repeat: no-repeat;
-          filter: saturate(1.1);
-          transform: scale(1);
-          transition: opacity ${EXIT_DURATION_MS}ms ease, transform ${EXIT_DURATION_MS}ms ease;
-          animation: handoffFlow 7.5s ease-in-out infinite alternate;
-        }
-
-        .is-exiting .handoff-layer {
-          opacity: 1;
-          transform: scale(1.025);
-        }
-
-        .center-stage {
-          position: relative;
-          width: min(95vw, 1020px);
-          height: min(43vw, 290px);
-          min-height: 190px;
-          margin: 0 auto;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          isolation: isolate;
-        }
-
-        .paint-field {
-          z-index: 0;
-          -webkit-mask-image: radial-gradient(ellipse 38% 24% at 50% 52%, transparent 0%, transparent 56%, black 68%);
-          mask-image: radial-gradient(ellipse 38% 24% at 50% 52%, transparent 0%, transparent 56%, black 68%);
-        }
-
-        .scribble-wrap {
+        .bg-layer {
           position: absolute;
           inset: 0;
-          margin-inline: auto;
-          width: min(95vw, 980px);
-          filter: drop-shadow(0 0 12px rgba(248, 113, 113, 0.18))
-            drop-shadow(0 0 16px rgba(125, 211, 252, 0.12));
-          display: flex;
-          align-items: center;
-          z-index: 1;
-          -webkit-mask-image: radial-gradient(ellipse 38% 24% at 50% 52%, transparent 0%, transparent 56%, black 68%);
-          mask-image: radial-gradient(ellipse 38% 24% at 50% 52%, transparent 0%, transparent 56%, black 68%);
+          background:
+            radial-gradient(circle at 14% 22%, rgba(255, 47, 143, 0.22), transparent 42%),
+            radial-gradient(circle at 85% 20%, rgba(58, 103, 255, 0.2), transparent 40%),
+            radial-gradient(circle at 78% 80%, rgba(255, 217, 56, 0.18), transparent 45%),
+            radial-gradient(circle at 20% 82%, rgba(156, 251, 45, 0.16), transparent 44%),
+            #0c0f19;
+          transition: opacity ${EXIT_DURATION_MS}ms ease;
         }
 
-        .scribble-svg {
-          width: 100%;
-          height: auto;
-        }
-
-        .scribble {
-          fill: none;
-          stroke-linecap: round;
-          stroke-width: 9;
-          stroke-dasharray: 1600;
-          stroke-dashoffset: 1600;
-          animation: drawScribble 2.8s cubic-bezier(0.12, 0.66, 0.22, 1) forwards;
-        }
-
-        .s1 {
-          stroke: #f97316;
-          animation-delay: 200ms;
-        }
-
-        .s2 {
-          stroke: #38bdf8;
-          stroke-width: 8;
-          animation-delay: 720ms;
-        }
-
-        .s3 {
-          stroke: #facc15;
-          stroke-width: 7;
-          animation-delay: 1120ms;
-        }
-
-        .paint-drip {
-          fill: none;
-          stroke-linecap: round;
-          stroke-width: 6;
-          opacity: 0;
-          animation: dripDown 1100ms ease-out forwards;
-        }
-
-        .d1 {
-          stroke: #f97316;
-          animation-delay: 1550ms;
-        }
-
-        .d2 {
-          stroke: #38bdf8;
-          animation-delay: 1720ms;
-        }
-
-        .d3 {
-          stroke: #facc15;
-          animation-delay: 1860ms;
-        }
-
-        .paint-dot {
-          position: absolute;
-          border-radius: 9999px;
-          opacity: 0;
-          filter: blur(0.35px);
-          animation: paintPop 780ms ease-out forwards;
-        }
-
-        .logo-wrap {
+        .scene {
           position: relative;
-          z-index: 5;
+          height: 100%;
+          width: 100%;
           display: flex;
+          flex-direction: column;
           justify-content: center;
           align-items: center;
+          transition: opacity ${EXIT_DURATION_MS}ms ease, transform ${EXIT_DURATION_MS}ms ease;
+        }
+
+        .is-exiting .scene,
+        .is-exiting .bg-layer {
+          opacity: 0;
+        }
+
+        .is-exiting .scene {
+          transform: scale(1.012);
+        }
+
+        .copy-wrap {
+          position: relative;
+          z-index: 2;
+          text-align: center;
+          width: min(96vw, 1400px);
+          padding-inline: 1.2rem;
+        }
+
+        .line {
+          margin: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+          font-family: "Octin Spraypaint", "Arial Black", sans-serif;
+          color: #3a67ff;
+          line-height: 0.98;
           opacity: 0;
           transform: translateY(10px);
-          animation: logoIn 1300ms ease-out 1700ms forwards;
+          animation: lineIn 500ms ease-out forwards;
         }
 
-        .logo-shield {
+        .l1 {
+          font-size: clamp(3.2rem, 7.8vw, 9.6rem);
+          animation-delay: 320ms;
+        }
+
+        .l2 {
+          margin-top: clamp(0.35rem, 1.1vw, 1rem);
+          font-size: clamp(3.2rem, 7.8vw, 9.6rem);
+          animation-delay: 540ms;
+        }
+
+        .gradient-line {
+          margin-top: clamp(0.55rem, 1.6vw, 1.35rem);
+          display: inline-flex;
+          align-items: center;
+          gap: clamp(0.4rem, 1.1vw, 1rem);
+          font-size: clamp(2.9rem, 6.6vw, 8.4rem);
+          background: linear-gradient(90deg, #ff2f8f 0%, #ffd938 35%, #9cfb2d 66%, #3a67ff 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation-delay: 760ms;
+        }
+
+        .star {
+          font-size: 0.42em;
+          line-height: 1;
+          transform: translateY(-0.04em);
+          color: #ffd938;
+          -webkit-text-fill-color: #ffd938;
+        }
+
+        .progress-squiggle {
           position: absolute;
           left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          width: min(82vw, 560px);
-          height: min(24vw, 170px);
-          background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.86) 0%, rgba(0, 0, 0, 0.68) 54%, rgba(0, 0, 0, 0) 100%);
-          filter: blur(6px);
-          z-index: 0;
+          bottom: max(12px, env(safe-area-inset-bottom));
+          transform: translateX(-50%);
+          width: min(80vw, 720px);
+          height: auto;
+          z-index: 2;
+          opacity: 0.95;
         }
 
-        .logo-image {
-          position: relative;
-          z-index: 1;
+        .squiggle-svg {
+          width: 100%;
+          height: auto;
+          overflow: visible;
         }
 
-        .hud {
-          margin-top: 1.2rem;
+        .squiggle-track {
+          fill: none;
+          stroke: rgba(255, 255, 255, 0.16);
+          stroke-width: 8;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
 
-        .status-copy {
-          text-align: center;
-          color: rgba(255, 249, 219, 0.95);
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          font-size: 0.76rem;
-          opacity: 0;
-          animation: fadeUp 900ms ease-out 2200ms forwards;
+        .squiggle-fill {
+          fill: none;
+          stroke: url(#squiggleGrad);
+          stroke-width: 9;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 1000;
+          stroke-dashoffset: 1000;
+          filter: drop-shadow(0 0 7px rgba(255, 47, 143, 0.6))
+            drop-shadow(0 0 7px rgba(156, 251, 45, 0.45));
+          animation: drawLoad ${MIN_VISIBLE_MS}ms linear forwards;
         }
 
-        .progress-track {
-          margin: 0.95rem auto 0;
-          width: min(86vw, 360px);
-          height: 8px;
-          border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.14);
-          overflow: hidden;
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-        }
-
-        .progress-fill {
-          display: block;
-          height: 100%;
-          width: 0%;
-          background: linear-gradient(90deg, #f97316 0%, #facc15 50%, #38bdf8 100%);
-          box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
-          animation: fillTrack ${MIN_VISIBLE_MS}ms linear forwards;
-        }
-
-        @keyframes wallDrift {
-          0% {
-            transform: scale(1) translate3d(0, 0, 0);
+        @keyframes lineIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
           }
-          100% {
-            transform: scale(1.03) translate3d(-6px, 3px, 0);
+          to {
+            opacity: 1;
+            transform: translateY(0);
           }
         }
 
-        @keyframes handoffFlow {
-          0% {
-            background-position: 0% 50%, 100% 10%, 50% 100%, 0% 50%, center;
+        @keyframes drawLoad {
+          from {
+            stroke-dashoffset: 1000;
           }
-          50% {
-            background-position: 38% 58%, 62% 30%, 50% 85%, 58% 48%, center;
-          }
-          100% {
-            background-position: 100% 46%, 0% 35%, 50% 70%, 100% 42%, center;
-          }
-        }
-
-        @keyframes drawScribble {
-          0% {
-            stroke-dashoffset: 1600;
-          }
-          100% {
+          to {
             stroke-dashoffset: 0;
           }
         }
 
-        @keyframes dripDown {
-          0% {
-            opacity: 0;
-            stroke-dasharray: 0 100;
+        @media (max-width: 900px) {
+          .copy-wrap {
+            padding-inline: 0.8rem;
           }
-          45% {
-            opacity: 0.9;
-          }
-          100% {
-            opacity: 0.65;
-            stroke-dasharray: 50 100;
-          }
-        }
 
-        @keyframes paintPop {
-          0% {
-            opacity: 0;
-            transform: scale(0.25);
+          .gradient-line {
+            flex-wrap: wrap;
+            justify-content: center;
+            row-gap: 0.12em;
           }
-          70% {
-            opacity: 0.9;
-            transform: scale(1.2);
-          }
-          100% {
-            opacity: 0.7;
-            transform: scale(1);
-          }
-        }
 
-        @keyframes logoIn {
-          0% {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fadeUp {
-          0% {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fillTrack {
-          0% {
-            width: 0%;
-          }
-          100% {
-            width: 100%;
+          .progress-squiggle {
+            width: min(88vw, 620px);
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .wall-layer,
-          .scribble,
-          .paint-drip,
-          .paint-dot,
-          .logo-wrap,
-          .status-copy,
-          .progress-fill {
+          .line,
+          .squiggle-fill {
             animation-duration: 1ms !important;
             animation-delay: 0ms !important;
             animation-iteration-count: 1 !important;
           }
-          .preloader-scene,
-          .wall-layer,
-          .handoff-layer {
+          .scene,
+          .bg-layer {
             transition-duration: 1ms !important;
           }
-          .progress-fill {
-            width: 100%;
+          .squiggle-fill {
+            stroke-dashoffset: 0;
           }
         }
       `}</style>

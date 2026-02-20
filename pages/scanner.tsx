@@ -7,9 +7,11 @@ import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db, auth } from "@/firebase/clientApp";
 import { adminAuth } from "@/firebase/admin";
 import {
+  ADMIN_BYPASS_COOKIE_NAME,
   ADMIN_SESSION_COOKIE_NAME,
   isAllowedAdminEmail,
   normalizeAdminEmail,
+  verifyAdminBypassToken,
 } from "@/lib/adminAuth";
 
 type ScanField = "check_in" | "lunch_1" | "lunch_2" | "breakfast" | "dinner";
@@ -264,6 +266,13 @@ export default function ScannerPage({ adminEmail }: ScannerPageProps) {
 }
 
 export const getServerSideProps: GetServerSideProps<ScannerPageProps> = async (context) => {
+  const bypassCookie = context.req.cookies[ADMIN_BYPASS_COOKIE_NAME];
+  if (bypassCookie && verifyAdminBypassToken(bypassCookie)) {
+    return {
+      props: { adminEmail: "bypass@local" },
+    };
+  }
+
   const sessionCookie = context.req.cookies[ADMIN_SESSION_COOKIE_NAME];
   if (!sessionCookie) {
     return {

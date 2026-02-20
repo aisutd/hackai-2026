@@ -1,14 +1,32 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
-const SCRIBBLE_FADE_DELAY_MS = 2000;
-const SCRIBBLE_FADE_DURATION_MS = 700;
+const SCRIBBLE_FADE_DELAY_MS = 0;
+const SCRIBBLE_FADE_DURATION_MS = 1000;
 
 type Point = { x: number; y: number };
 
 type LogoScribbleProps = {
   className?: string;
   onLogoLoad?: () => void;
+};
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const sanitized = hex.trim().replace("#", "");
+  const normalized =
+    sanitized.length === 3
+      ? sanitized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : sanitized;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return `rgba(255,122,0,${alpha})`;
+
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 };
 
 export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbleProps) {
@@ -155,14 +173,44 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
       if (!inkCtx) return;
 
       const dpr = window.devicePixelRatio || 1;
-      inkCtx.strokeStyle = brushColor;
-      inkCtx.lineCap = "round";
-      inkCtx.lineJoin = "round";
-      inkCtx.lineWidth = 10 * dpr;
-      inkCtx.beginPath();
-      inkCtx.moveTo(from.x, from.y);
-      inkCtx.lineTo(to.x, to.y);
-      inkCtx.stroke();
+      const sizeScale = Math.max(0.72, Math.min(1.08, inkCanvas.width / (1080 * dpr)));
+
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const distance = Math.hypot(dx, dy);
+      const stepSize = Math.max(1, 3.5 * dpr);
+      const stamps = Math.max(1, Math.ceil(distance / stepSize));
+      const coreRadius = 2.8 * dpr * sizeScale;
+      const sprayRadius = 8.5 * dpr * sizeScale;
+
+      for (let i = 0; i <= stamps; i += 1) {
+        const t = stamps === 0 ? 0 : i / stamps;
+        const baseX = from.x + dx * t;
+        const baseY = from.y + dy * t;
+
+        const blobX = baseX + (Math.random() - 0.5) * (1.6 * dpr);
+        const blobY = baseY + (Math.random() - 0.5) * (1.6 * dpr);
+        const blobSize = coreRadius * (0.85 + Math.random() * 0.5);
+
+        inkCtx.fillStyle = hexToRgba(brushColor, 0.2 + Math.random() * 0.2);
+        inkCtx.beginPath();
+        inkCtx.arc(blobX, blobY, blobSize, 0, Math.PI * 2);
+        inkCtx.fill();
+
+        const particleCount = 5 + Math.floor(Math.random() * 4);
+        for (let p = 0; p < particleCount; p += 1) {
+          const angle = Math.random() * Math.PI * 2;
+          const radius = Math.random() * sprayRadius;
+          const px = baseX + Math.cos(angle) * radius;
+          const py = baseY + Math.sin(angle) * radius;
+          const particleSize = (0.25 + Math.random() * 0.9) * dpr;
+
+          inkCtx.fillStyle = hexToRgba(brushColor, 0.04 + Math.random() * 0.16);
+          inkCtx.beginPath();
+          inkCtx.arc(px, py, particleSize, 0, Math.PI * 2);
+          inkCtx.fill();
+        }
+      }
 
       inkOpacityRef.current = 1;
       renderMaskedInk();
@@ -179,6 +227,7 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (!scribbleEnabled) return;
+      event.preventDefault();
       const point = toCanvasPoint(event);
       if (!point) return;
 
@@ -197,6 +246,7 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (!drawingRef.current) return;
       if (pointerIdRef.current !== event.pointerId) return;
+      event.preventDefault();
       const point = toCanvasPoint(event);
       if (!point || !lastPointRef.current) return;
 
@@ -209,6 +259,7 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
   const handlePointerUp = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (pointerIdRef.current !== event.pointerId) return;
+      event.preventDefault();
       finishStroke();
       pointerIdRef.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -221,6 +272,7 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
   const handlePointerLeave = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (pointerIdRef.current !== event.pointerId) return;
+      event.preventDefault();
       finishStroke();
       pointerIdRef.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -270,8 +322,12 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
       <canvas
         ref={canvasRef}
         className={`absolute inset-0 h-full w-full ${
-          scribbleEnabled ? "cursor-crosshair pointer-events-auto" : "pointer-events-none"
+          scribbleEnabled
+            ? "cursor-crosshair pointer-events-auto touch-none select-none"
+            : "pointer-events-none"
         }`}
+        style={{ touchAction: "none", WebkitUserSelect: "none" }}
+        onContextMenu={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -279,7 +335,10 @@ export default function LogoScribble({ className = "", onLogoLoad }: LogoScribbl
         onPointerLeave={handlePointerLeave}
       />
 
-      <div className="absolute left-1/2 -translate-x-1/2 -top-14 z-30 flex items-center gap-3 rounded-full border border-white/25 bg-black/45 px-3 py-2 backdrop-blur-sm">
+      <div
+        className="fixed left-1/2 -translate-x-1/2 md:left-auto md:right-5 md:translate-x-0 z-[80] flex max-w-[92vw] flex-wrap items-center justify-center gap-2 sm:gap-3 rounded-full border border-white/25 bg-black/45 px-3 py-2 backdrop-blur-sm"
+        style={{ top: "max(10px, env(safe-area-inset-top))" }}
+      >
         <label
           className="flex items-center gap-2 text-white text-xs sm:text-sm tracking-wide"
           style={{ fontFamily: "Street Flow NYC" }}
