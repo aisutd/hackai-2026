@@ -207,14 +207,14 @@ function AdminHackersPage() {
                 : Array.isArray(data.scans)
                   ? data.scans.length
                   : 0;
-            return {
-              id: docSnap.id,
-              displayName: getDisplayName(docSnap.id, data),
-              email: toSafeString(data.email),
-              hasLoggedIn: Boolean(data.hasLoggedin),
-              isCheckedIn: getBooleanByKeys(data, ["isCheckedIn", "checkedIn"]),
-              status: toSafeString(data.status).trim().toLowerCase(),
-              lastScannedAt: formatDateValue(data.lastScannedAt),
+              return {
+                id: docSnap.id,
+                displayName: getDisplayName(docSnap.id, data),
+                email: toSafeString(data.email),
+                hasLoggedIn: Boolean(data.hasLoggedIn) || Boolean(data.hasLoggedin),
+                isCheckedIn: getBooleanByKeys(data, ["isCheckedIn", "checkedIn"]),
+                status: toSafeString(data.status).trim().toLowerCase(),
+                lastScannedAt: formatDateValue(data.lastScannedAt),
               waitlistedAt: formatDateValue(data.waitlistedAt),
               waitlistedAtEpoch: dateToEpoch(data.waitlistedAt),
               scanCount,
@@ -364,7 +364,7 @@ function AdminHackersPage() {
         lname: lastName,
         status: manualProfile.status,
         foodGroup: foodGroup || "",
-        hasLoggedin: false,
+        hasLoggedIn: false,
         isCheckedIn: false,
         breakfast: false,
         dinner: false,

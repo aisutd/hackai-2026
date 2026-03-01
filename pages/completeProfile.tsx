@@ -42,7 +42,7 @@ const normalizePhoneForStorage = (value: string): string | null => {
 
 const pickPrimaryMatch = (matches: HackerMatch[]): HackerMatch | null => {
   if (matches.length === 0) return null;
-  return matches.find((item) => Boolean(item.data.hasLoggedin)) ?? matches[0];
+  return matches.find((item) => Boolean(item.data.hasLoggedIn) || Boolean(item.data.hasLoggedin)) ?? matches[0];
 };
 
 const CompleteProfile = () => {

@@ -16,7 +16,14 @@ import {
 import { isAdminEmail } from "@/utils/adminAccess";
 
 const HACKERS_COLLECTION = "hackers";
-type HackerMatch = { id: string; data: Record<string, unknown> & { hasLoggedin?: boolean; email?: string } };
+type HackerMatch = {
+  id: string;
+  data: Record<string, unknown> & { hasLoggedIn?: boolean; hasLoggedin?: boolean; email?: string };
+};
+
+const getHasLoggedIn = (data: Record<string, unknown>): boolean => {
+  return Boolean(data.hasLoggedIn) || Boolean(data.hasLoggedin);
+};
 
 const getPhoneFromData = (data: Record<string, unknown>): string => {
   const candidates = [data.phone_number, data.phoneNumber, data.phone];
@@ -54,7 +61,7 @@ const SignIn = () => {
         seen.add(docSnap.id);
         matches.push({
           id: docSnap.id,
-          data: docSnap.data() as { hasLoggedin?: boolean; email?: string },
+          data: docSnap.data() as { hasLoggedIn?: boolean; hasLoggedin?: boolean; email?: string },
         });
       }
     }
@@ -65,21 +72,21 @@ const SignIn = () => {
   const findHackerByEmail = useCallback(async (rawEmail: string) => {
     const matches = await getHackersByEmail(rawEmail);
     if (matches.length === 0) return null;
-    const registered = matches.find((item) => Boolean(item.data.hasLoggedin));
+    const registered = matches.find((item) => getHasLoggedIn(item.data));
     return (registered ?? matches[0]).data;
   }, [getHackersByEmail]);
 
   const resolveUserDestination = useCallback(async (rawEmail: string): Promise<"/userProfile" | "/completeProfile"> => {
     const matches = await getHackersByEmail(rawEmail);
     if (matches.length === 0) return "/completeProfile";
-    const registered = matches.find((item) => Boolean(item.data.hasLoggedin)) ?? matches[0];
+    const registered = matches.find((item) => getHasLoggedIn(item.data)) ?? matches[0];
     const hasPhone = Boolean(getPhoneFromData(registered.data));
     return hasPhone ? "/userProfile" : "/completeProfile";
   }, [getHackersByEmail]);
 
   const hasRegisteredHackerByEmail = useCallback(async (rawEmail: string, excludeDocId?: string) => {
     const matches = await getHackersByEmail(rawEmail);
-    return matches.some((item) => item.id !== excludeDocId && Boolean(item.data.hasLoggedin));
+    return matches.some((item) => item.id !== excludeDocId && getHasLoggedIn(item.data));
   }, [getHackersByEmail]);
 
   const enforceAllowedLogin = useCallback(async (rawEmail: string): Promise<"admin" | "user" | "blocked"> => {
@@ -88,7 +95,7 @@ const SignIn = () => {
     if (isAdminEmail(email)) return "admin";
 
     const hacker = await findHackerByEmail(email);
-    if (hacker?.hasLoggedin) return "user";
+    if (hacker && getHasLoggedIn(hacker)) return "user";
     return "blocked";
   }, [findHackerByEmail]);
 
@@ -165,7 +172,7 @@ const SignIn = () => {
         return { ok: false };
       }
       const data = docSnap.data();
-      if (data.hasLoggedin && mode === "register") {
+      if (getHasLoggedIn(data)) {
         setError("This code has already been used to register.");
         setLoading(false);
         return { ok: false };
@@ -238,7 +245,7 @@ const SignIn = () => {
         await createUserWithEmailAndPassword(auth, normalizedEmail, password);
         await Promise.all(
           applicantMatches.map((match) =>
-            updateDoc(doc(db, HACKERS_COLLECTION, match.id), { hasLoggedin: true })
+            updateDoc(doc(db, HACKERS_COLLECTION, match.id), { hasLoggedIn: true })
           )
         );
         alert("Account created! You can now log in.");
@@ -431,7 +438,7 @@ const SignIn = () => {
         return;
       }
 
-      await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedin: true });
+      await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
       router.replace("/completeProfile");
     } catch (err: unknown) {
       const code =
