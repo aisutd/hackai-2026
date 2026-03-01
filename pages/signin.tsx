@@ -25,6 +25,8 @@ const getHasLoggedIn = (data: Record<string, unknown>): boolean => {
   return Boolean(data.hasLoggedIn) || Boolean(data.hasLoggedin);
 };
 
+const isValidEmail = (value: string): boolean => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+
 const getPhoneFromData = (data: Record<string, unknown>): string => {
   const candidates = [data.phone_number, data.phoneNumber, data.phone];
   for (const candidate of candidates) {
@@ -211,7 +213,7 @@ const SignIn = () => {
       if (!codeResult.ok) return;
       normalizedEmail = codeResult.applicantEmail;
 
-      if (!/^[^@\s]+@gmail\.com$/.test(normalizedEmail)) {
+      if (!isValidEmail(normalizedEmail)) {
         setError("Invalid email. Please use the one you used on the application.");
         return;
       }
@@ -262,8 +264,8 @@ const SignIn = () => {
     } else {
       // Login mode
       const normalizedEmail = email.trim().toLowerCase();
-      if (!isAdminEmail(normalizedEmail) && !/^[^@\s]+@gmail\.com$/.test(normalizedEmail)) {
-        setError("Invalid email. Use a Gmail account or the admin email.");
+      if (!isValidEmail(normalizedEmail)) {
+        setError("Invalid email.");
         return;
       }
       if (password.length < 6) {
@@ -310,15 +312,6 @@ const SignIn = () => {
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
       const email = (result.user.email || "").toLowerCase();
-      const adminEmail = isAdminEmail(email);
-
-      if (!adminEmail && !/^[^@\s]+@gmail\.com$/.test(email)) {
-        await signOut(auth);
-        setError("Please sign in with a Gmail account or the admin email.");
-        setLoading(false);
-        return;
-      }
-
       const additionalInfo = getAdditionalUserInfo(result);
       const destination = await enforceAllowedLogin(email);
       if (destination === "blocked") {
@@ -383,8 +376,8 @@ const SignIn = () => {
       return;
     }
 
-    if (!/^[^@\s]+@gmail\.com$/.test(expectedEmail)) {
-      setError("This code is not linked to a valid Gmail account.");
+    if (!isValidEmail(expectedEmail)) {
+      setError("This code is not linked to a valid email account.");
       return;
     }
 
@@ -414,14 +407,14 @@ const SignIn = () => {
       const additionalInfo = getAdditionalUserInfo(result);
       const isNewUser = Boolean(additionalInfo?.isNewUser);
 
-      if (!/^[^@\s]+@gmail\.com$/.test(googleEmail)) {
+      if (!isValidEmail(googleEmail)) {
         if (isNewUser) {
           await deleteUser(result.user);
         } else {
           await signOut(auth);
         }
         isAuthGuardPausedRef.current = false;
-        setError("Please sign up with a Gmail account.");
+        setError("Unable to determine a valid email from Google account.");
         setLoading(false);
         return;
       }
@@ -433,7 +426,7 @@ const SignIn = () => {
           await signOut(auth);
         }
         isAuthGuardPausedRef.current = false;
-        setError(`This code is linked to ${expectedEmail}. Please use that Gmail account.`);
+        setError(`This code is linked to ${expectedEmail}. Please use that email account.`);
         setLoading(false);
         return;
       }
@@ -499,7 +492,7 @@ const SignIn = () => {
           <div className="w-full px-4 md:px-8">
             <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
           <h2 className="text-3xl font-bold mb-2 text-center">
-            {mode === "register" ? "Create an account" : "Sign in with Gmail"}
+            {mode === "register" ? "Create an account" : "Sign in"}
           </h2>
           <div className="mb-2 text-center text-gray-400">
             {mode === "register" ? (
