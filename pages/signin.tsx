@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/router";
 import { db, auth } from "@/firebase/clientApp";
@@ -43,6 +43,7 @@ const SignIn = () => {
   const [mode, setMode] = useState<"register" | "login">("login");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isAuthGuardPausedRef = useRef(false);
 
   const getHackersByEmail = useCallback(async (rawEmail: string): Promise<HackerMatch[]> => {
     const email = rawEmail.trim();
@@ -104,6 +105,7 @@ const SignIn = () => {
     let active = true;
     const unsubscribe = auth.onAuthStateChanged((user) => {
       const syncRoute = async () => {
+        if (isAuthGuardPausedRef.current) return;
         if (!user) return;
         const destination = await enforceAllowedLogin(user.email || "");
         if (!active) return;
@@ -242,6 +244,7 @@ const SignIn = () => {
       setError("");
       setLoading(true);
       try {
+        isAuthGuardPausedRef.current = true;
         await createUserWithEmailAndPassword(auth, normalizedEmail, password);
         await Promise.all(
           applicantMatches.map((match) =>
@@ -251,6 +254,7 @@ const SignIn = () => {
         alert("Account created! You can now log in.");
         window.location.href = "/signin";
       } catch (err: unknown) {
+        isAuthGuardPausedRef.current = false;
         const message = err instanceof Error ? err.message : "Error creating account. Try again.";
         setError(message);
       }
@@ -301,6 +305,7 @@ const SignIn = () => {
     setError("");
     setLoading(true);
     try {
+      isAuthGuardPausedRef.current = true;
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
@@ -415,6 +420,7 @@ const SignIn = () => {
         } else {
           await signOut(auth);
         }
+        isAuthGuardPausedRef.current = false;
         setError("Please sign up with a Gmail account.");
         setLoading(false);
         return;
@@ -426,6 +432,7 @@ const SignIn = () => {
         } else {
           await signOut(auth);
         }
+        isAuthGuardPausedRef.current = false;
         setError(`This code is linked to ${expectedEmail}. Please use that Gmail account.`);
         setLoading(false);
         return;
@@ -433,6 +440,7 @@ const SignIn = () => {
 
       if (!isNewUser) {
         await signOut(auth);
+        isAuthGuardPausedRef.current = false;
         setError("Google account already exists. Use Sign in with Google on the sign-in view.");
         setLoading(false);
         return;
@@ -441,6 +449,7 @@ const SignIn = () => {
       await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
       router.replace("/completeProfile");
     } catch (err: unknown) {
+      isAuthGuardPausedRef.current = false;
       const code =
         typeof err === "object" && err !== null && "code" in err
           ? String((err as { code: unknown }).code)
