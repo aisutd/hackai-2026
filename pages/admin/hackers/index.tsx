@@ -12,6 +12,8 @@ type HackerRow = {
   displayName: string;
   email: string;
   hasLoggedIn: boolean;
+  isCheckedIn: boolean;
+  status: string;
   lastScannedAt: string;
   scanCount: number;
 };
@@ -37,6 +39,20 @@ const getStringByKeys = (data: Record<string, unknown>, keys: string[]): string 
   }
 
   return "";
+};
+
+const getBooleanByKeys = (data: Record<string, unknown>, keys: string[]): boolean => {
+  const normalized = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(data)) {
+    normalized.set(normalizeKey(key), value);
+  }
+
+  for (const key of keys) {
+    const value = normalized.get(normalizeKey(key));
+    if (typeof value === "boolean") return value;
+  }
+
+  return false;
 };
 
 const titleCase = (value: string): string =>
@@ -106,6 +122,8 @@ function AdminHackersPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [checkedInFilter, setCheckedInFilter] = useState<"all" | "true" | "false">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "accepted" | "rejected">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [hackers, setHackers] = useState<HackerRow[]>([]);
 
@@ -148,6 +166,8 @@ function AdminHackersPage() {
               displayName: getDisplayName(docSnap.id, data),
               email: toSafeString(data.email),
               hasLoggedIn: Boolean(data.hasLoggedin),
+              isCheckedIn: getBooleanByKeys(data, ["isCheckedIn", "checkedIn"]),
+              status: toSafeString(data.status).trim().toLowerCase(),
               lastScannedAt: formatDateValue(data.lastScannedAt),
               scanCount,
             };
@@ -172,16 +192,27 @@ function AdminHackersPage() {
 
   const filteredHackers = useMemo(() => {
     const query = searchText.trim().toLowerCase();
-    if (!query) return hackers;
     return hackers.filter((hacker) => {
-      const candidates = [hacker.displayName, hacker.email, hacker.id];
-      return candidates.some((candidate) => candidate.toLowerCase().includes(query));
+      const matchesSearch =
+        !query ||
+        [hacker.displayName, hacker.email, hacker.id].some((candidate) =>
+          candidate.toLowerCase().includes(query)
+        );
+
+      const matchesCheckedIn =
+        checkedInFilter === "all" ||
+        (checkedInFilter === "true" ? hacker.isCheckedIn : !hacker.isCheckedIn);
+
+      const matchesStatus =
+        statusFilter === "all" || hacker.status === statusFilter;
+
+      return matchesSearch && matchesCheckedIn && matchesStatus;
     });
-  }, [hackers, searchText]);
+  }, [checkedInFilter, hackers, searchText, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchText]);
+  }, [checkedInFilter, searchText, statusFilter]);
 
   const totalPages = useMemo(() => {
     const pages = Math.ceil(filteredHackers.length / ITEMS_PER_PAGE);
@@ -214,6 +245,67 @@ function AdminHackersPage() {
   const hasNextWindow = pageWindowEnd < totalPages;
   const showingStart = filteredHackers.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
   const showingEnd = Math.min(filteredHackers.length, currentPage * ITEMS_PER_PAGE);
+  const canShowPagination = !loading && !loadError && filteredHackers.length > 0;
+
+  const renderPagination = (wrapperClassName: string) => (
+    <div className={wrapperClassName}>
+      <div className="text-sm text-gray-300">
+        Showing {showingStart}-{showingEnd} of {filteredHackers.length}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => {
+            if (!hasPrevWindow) return;
+            setCurrentPage(Math.max(1, pageWindowStart - PAGE_WINDOW_SIZE));
+          }}
+          disabled={!hasPrevWindow}
+          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/20 bg-black/35 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10"
+          aria-label="Previous page set"
+        >
+          <FaAngleLeft />
+        </button>
+
+        {pageNumbers.map((pageNum) => (
+          <button
+            key={pageNum}
+            type="button"
+            onClick={() => setCurrentPage(pageNum)}
+            className={`h-9 min-w-9 px-3 inline-flex items-center justify-center rounded-lg border transition ${
+              pageNum === currentPage
+                ? "border-[#DDD059] bg-[#DDD059] text-black font-semibold"
+                : "border-white/20 bg-black/35 text-white hover:bg-white/10"
+            }`}
+          >
+            {pageNum}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => {
+            if (!hasNextWindow) return;
+            setCurrentPage(Math.min(totalPages, pageWindowStart + PAGE_WINDOW_SIZE));
+          }}
+          disabled={!hasNextWindow}
+          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/20 bg-black/35 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10"
+          aria-label="Next page set"
+        >
+          <FaAngleRight />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={currentPage >= totalPages}
+          className="rounded-lg px-3 py-2 border border-white/20 bg-black/35 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
 
   if (isAdmin !== true) {
     return (
@@ -256,6 +348,36 @@ function AdminHackersPage() {
             />
           </div>
 
+          <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="block">
+              <div className="text-xs uppercase tracking-widest text-gray-300 mb-1">Checked In</div>
+              <select
+                value={checkedInFilter}
+                onChange={(e) => setCheckedInFilter(e.target.value as "all" | "true" | "false")}
+                className="w-full rounded-xl px-4 py-3 bg-black/35 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#a259ff]"
+              >
+                <option value="all" className="text-black">All</option>
+                <option value="true" className="text-black">True</option>
+                <option value="false" className="text-black">False</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <div className="text-xs uppercase tracking-widest text-gray-300 mb-1">Status</div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | "accepted" | "rejected")}
+                className="w-full rounded-xl px-4 py-3 bg-black/35 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#a259ff]"
+              >
+                <option value="all" className="text-black">All</option>
+                <option value="accepted" className="text-black">Accepted</option>
+                <option value="rejected" className="text-black">Rejected</option>
+              </select>
+            </label>
+          </div>
+
+          {canShowPagination && renderPagination("mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3")}
+
           <div className="rounded-2xl border border-white/15 bg-black/25 overflow-hidden">
             {loading && <div className="px-4 py-5 text-sm text-gray-300">Loading hackers...</div>}
             {!loading && loadError && <div className="px-4 py-5 text-sm text-red-300">{loadError}</div>}
@@ -287,6 +409,26 @@ function AdminHackersPage() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-300 uppercase tracking-widest">
+                        Checked In:{" "}
+                        <span className={hacker.isCheckedIn ? "text-green-300" : "text-red-300"}>
+                          {hacker.isCheckedIn ? "True" : "False"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-300 uppercase tracking-widest">
+                        Status:{" "}
+                        <span
+                          className={
+                            hacker.status === "accepted"
+                              ? "text-green-300"
+                              : hacker.status === "rejected"
+                                ? "text-red-300"
+                                : "text-gray-200"
+                          }
+                        >
+                          {hacker.status || "unknown"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-300 uppercase tracking-widest">
                         Scans: <span className="text-[#DDD059]">{hacker.scanCount}</span>
                       </div>
                       <div className="text-xs text-gray-300 hidden lg:block">
@@ -299,65 +441,7 @@ function AdminHackersPage() {
               ))}
           </div>
 
-          {!loading && !loadError && filteredHackers.length > 0 && (
-            <div className="mt-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div className="text-sm text-gray-300">
-                Showing {showingStart}-{showingEnd} of {filteredHackers.length}
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!hasPrevWindow) return;
-                    setCurrentPage(Math.max(1, pageWindowStart - PAGE_WINDOW_SIZE));
-                  }}
-                  disabled={!hasPrevWindow}
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/20 bg-black/35 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10"
-                  aria-label="Previous page set"
-                >
-                  <FaAngleLeft />
-                </button>
-
-                {pageNumbers.map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`h-9 min-w-9 px-3 inline-flex items-center justify-center rounded-lg border transition ${
-                      pageNum === currentPage
-                        ? "border-[#DDD059] bg-[#DDD059] text-black font-semibold"
-                        : "border-white/20 bg-black/35 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!hasNextWindow) return;
-                    setCurrentPage(Math.min(totalPages, pageWindowStart + PAGE_WINDOW_SIZE));
-                  }}
-                  disabled={!hasNextWindow}
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/20 bg-black/35 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10"
-                  aria-label="Next page set"
-                >
-                  <FaAngleRight />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage >= totalPages}
-                  className="rounded-lg px-3 py-2 border border-white/20 bg-black/35 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          {canShowPagination && renderPagination("mt-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3")}
         </div>
       </div>
     </div>
