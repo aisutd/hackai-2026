@@ -6,7 +6,6 @@ import { collection, doc, getDoc, getDocs, limit, query, updateDoc, where } from
 import {
   createUserWithEmailAndPassword,
   deleteUser,
-  fetchSignInMethodsForEmail,
   getAdditionalUserInfo,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
@@ -233,16 +232,6 @@ const SignIn = () => {
         return;
       }
 
-      const existingMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
-      if (existingMethods.length > 0) {
-        if (existingMethods.includes("google.com") && !existingMethods.includes("password")) {
-          setError("This email is already registered with Google. Use Sign in with Google.");
-        } else {
-          setError("This email already has an account. Please sign in instead.");
-        }
-        return;
-      }
-
       setError("");
       setLoading(true);
       try {
@@ -253,12 +242,44 @@ const SignIn = () => {
             updateDoc(doc(db, HACKERS_COLLECTION, match.id), { hasLoggedIn: true })
           )
         );
-        alert("Account created! You can now log in.");
-        window.location.href = "/signin";
-      } catch (err: unknown) {
         isAuthGuardPausedRef.current = false;
-        const message = err instanceof Error ? err.message : "Error creating account. Try again.";
-        setError(message);
+        const nextRoute = await resolveUserDestination(normalizedEmail);
+        router.replace(nextRoute);
+      } catch (err: unknown) {
+        const code =
+          typeof err === "object" && err !== null && "code" in err
+            ? String((err as { code: unknown }).code)
+            : "";
+        if (code === "auth/email-already-in-use") {
+          try {
+            await signInWithEmailAndPassword(auth, normalizedEmail, password);
+            await Promise.all(
+              applicantMatches.map((match) =>
+                updateDoc(doc(db, HACKERS_COLLECTION, match.id), { hasLoggedIn: true })
+              )
+            );
+            isAuthGuardPausedRef.current = false;
+            const nextRoute = await resolveUserDestination(normalizedEmail);
+            router.replace(nextRoute);
+          } catch (signInErr: unknown) {
+            isAuthGuardPausedRef.current = false;
+            const signInCode =
+              typeof signInErr === "object" && signInErr !== null && "code" in signInErr
+                ? String((signInErr as { code: unknown }).code)
+                : "";
+            if (signInCode === "auth/invalid-credential" || signInCode === "auth/wrong-password") {
+              setError("Account already exists. Use the correct password or sign in.");
+            } else {
+              const message =
+                signInErr instanceof Error ? signInErr.message : "Unable to finish signup. Please try again.";
+              setError(message);
+            }
+          }
+        } else {
+          isAuthGuardPausedRef.current = false;
+          const message = err instanceof Error ? err.message : "Error creating account. Try again.";
+          setError(message);
+        }
       }
       setLoading(false);
     } else {
@@ -275,12 +296,12 @@ const SignIn = () => {
       setError("");
       setLoading(true);
       try {
-        const result = await signInWithEmailAndPassword(auth, email, password);
-        const destination = await enforceAllowedLogin(result.user.email || email);
+        const result = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+        const destination = await enforceAllowedLogin(result.user.email || normalizedEmail);
         if (destination === "admin") {
           router.replace("/admin/hackers");
         } else if (destination === "user") {
-          const nextRoute = await resolveUserDestination(result.user.email || email);
+          const nextRoute = await resolveUserDestination(result.user.email || normalizedEmail);
           router.replace(nextRoute);
         } else {
           await signOut(auth);
@@ -312,6 +333,7 @@ const SignIn = () => {
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
       const email = (result.user.email || "").toLowerCase();
+      const adminEmail = isAdminEmail(email);
       const additionalInfo = getAdditionalUserInfo(result);
       const destination = await enforceAllowedLogin(email);
       if (destination === "blocked") {
@@ -324,6 +346,7 @@ const SignIn = () => {
         } else {
           await signOut(auth);
         }
+        isAuthGuardPausedRef.current = false;
         setError("No account found. Please sign up first using your 6-digit code.");
         setLoading(false);
         return;
@@ -335,6 +358,7 @@ const SignIn = () => {
         } catch {
           await signOut(auth);
         }
+        isAuthGuardPausedRef.current = false;
         setError("No account found. Please sign up first using your 6-digit code.");
         setLoading(false);
         return;
@@ -347,6 +371,7 @@ const SignIn = () => {
         router.replace(nextRoute);
       }
     } catch (err: unknown) {
+      isAuthGuardPausedRef.current = false;
       const code = typeof err === "object" && err !== null && "code" in err ? String((err as { code: unknown }).code) : "";
       if (code === "auth/popup-closed-by-user") {
         setError("Google sign-in was cancelled.");
@@ -386,20 +411,9 @@ const SignIn = () => {
       return;
     }
 
-    const existingMethods = await fetchSignInMethodsForEmail(auth, expectedEmail);
-    if (existingMethods.length > 0) {
-      if (existingMethods.includes("password")) {
-        setError("This email is already registered with email/password. Please sign in.");
-      } else if (existingMethods.includes("google.com")) {
-        setError("This email already has a Google account. Please use Sign in with Google.");
-      } else {
-        setError("This email already has an account. Please sign in instead.");
-      }
-      return;
-    }
-
     setLoading(true);
     try {
+      isAuthGuardPausedRef.current = true;
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
@@ -431,16 +445,10 @@ const SignIn = () => {
         return;
       }
 
-      if (!isNewUser) {
-        await signOut(auth);
-        isAuthGuardPausedRef.current = false;
-        setError("Google account already exists. Use Sign in with Google on the sign-in view.");
-        setLoading(false);
-        return;
-      }
-
       await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
-      router.replace("/completeProfile");
+      isAuthGuardPausedRef.current = false;
+      const nextRoute = await resolveUserDestination(expectedEmail);
+      router.replace(nextRoute);
     } catch (err: unknown) {
       isAuthGuardPausedRef.current = false;
       const code =
