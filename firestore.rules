@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == "aistech@aisociety.io";
+    }
+
+    function isOwnerByEmail() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && resource.data.email is string
+        && resource.data.email == request.auth.token.email;
+    }
+
+    function ownerCanUpdateSelfFieldsOnly() {
+      return isOwnerByEmail()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          "hasLoggedIn",
+          "phone_number",
+          "updatedAt",
+        ])
+        && (
+          !("hasLoggedIn" in request.resource.data)
+          || request.resource.data.hasLoggedIn == true
+        )
+        && (
+          !("phone_number" in request.resource.data)
+          || request.resource.data.phone_number is string
+        );
+    }
+
+    function isPublicSignupCodeLookup(hackerId) {
+      return request.auth == null
+        && hackerId.matches('^[0-9]{6}$')
+        && (
+          (resource.data.access_code is string && resource.data.access_code == hackerId)
+          || (resource.data.accessCode is string && resource.data.accessCode == hackerId)
+        );
+    }
+
+    match /schedule/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /faqs/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /donors/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /sponsors/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /tracks/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /keynote/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /hackers/{hackerId} {
+      // Public code-based lookup for signup only (single-doc reads, no listing).
+      allow get: if isAdmin() || isOwnerByEmail() || isPublicSignupCodeLookup(hackerId);
+
+      // Admin can list all. Signed-in users can only match docs where doc email == auth email.
+      allow list: if isAdmin() || isOwnerByEmail();
+
+      // Admin-only manual profile creation.
+      allow create: if isAdmin();
+
+      // Admin can update all fields; users can only set allowed self-service fields.
+      allow update: if isAdmin() || ownerCanUpdateSelfFieldsOnly();
+
+      allow delete: if isAdmin();
+    }
+
+    match /hackers/{hackerId}/scans/{scanId} {
+      allow get, list, create, update, delete: if isAdmin();
+    }
+
+    match /scannerStats/{docId} {
+      allow get, list, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Deny anything not explicitly allowed above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

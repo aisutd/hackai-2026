@@ -202,9 +202,18 @@ export default async function handler(
       return res.status(401).json({ ok: false, error: "Missing auth token." });
     }
 
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token, true);
     const callerEmail = normalizeString(decoded.email).toLowerCase();
-    const adminEmail = normalizeString(process.env.NEXT_PUBLIC_ADMIN_EMAIL || "aistech@aisociety.io").toLowerCase();
+    const adminEmail = normalizeString(process.env.ADMIN_EMAIL).toLowerCase();
+    if (!adminEmail) {
+      return res.status(500).json({
+        ok: false,
+        error: "ADMIN_EMAIL is not configured on the server.",
+      });
+    }
+    if (decoded.email_verified !== true) {
+      return res.status(403).json({ ok: false, error: "Verified admin account required." });
+    }
     if (!callerEmail || callerEmail !== adminEmail) {
       return res.status(403).json({ ok: false, error: "Admin access required." });
     }
