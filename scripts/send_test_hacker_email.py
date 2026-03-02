@@ -2,54 +2,124 @@
 """
 Send HackAI emails from Firestore using Gmail SMTP.
 
-Safety defaults:
-- DRY_RUN defaults to true (no real send).
-- TARGET_ACCESS_CODE defaults to "100000" (only this code is processed).
+Default behavior:
+- Reads from Firestore collection: hackers
+- Sends to all eligible rows
+- Skips rows if:
+  - email already received a successful send in this run
+  - row already has emailSentAt/email_sent_at/lastEmailSentAt in Firestore
+  - first+last name appears with multiple different emails
+  - email is invalid
 
-Expected Firestore:
-- Collection: hackers
-- Recipient field priority: email, school_email, personal_email
+Runtime controls:
+- Edit USER_SETTINGS below directly in this file.
 
-Required env vars:
-- SMTP_EMAIL
-- SMTP_APP_PASSWORD
+Firebase credentials:
+- FIREBASE_SERVICE_ACCOUNT_PATH
+  or
+- FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY
 
-Optional env vars:
-- FIREBASE_SERVICE_ACCOUNT_PATH (default: serviceAccountKey.json)
-- FIREBASE_PROJECT_ID
-- FIREBASE_CLIENT_EMAIL
-- FIREBASE_PRIVATE_KEY
-- FIRESTORE_COLLECTION (default: hackers)
-- TARGET_ACCESS_CODE (default: 100000)
-- EMAIL_FOOTER_IMAGE_PATH (default: public/Email/emailImage.png)
-- EMAIL_FOOTER_IMAGE_URL (fallback if file missing)
-- DRY_RUN (default: true)
-- COUNT_ONLY (default: false) prints counts and exits
-- TEST_RECEIVER_EMAIL (used when DRY_RUN is false and TEST_MODE is true)
-- TEST_MODE (default: false)
-- SEND_DELAY_SECONDS (default: 2.0)
-- BATCH_SIZE (default: 50)
-- BATCH_PAUSE_SECONDS (default: 20)
+SMTP credentials:
+- SMTP_EMAIL / SMTP_APP_PASSWORD in USER_SETTINGS
+  (or leave blank there and use env/.env.local fallback)
 """
 
 from __future__ import annotations
 
+import csv
 import os
+import re
 import smtplib
 import time
+from dataclasses import dataclass
+from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 from google.api_core.exceptions import DeadlineExceeded
 
-REQUIRED_SENDER_EMAIL = "anveetha.suresh@aisociety.io"
+EMAIL_SUBJECT = "🛹 HackAI 2026: Your Application Status & Event Details"
+VALID_STATUSES = {"accepted", "waitlist", "rejected"}
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+# ------------------------------
+# USER SETTINGS (edit these)
+# ------------------------------
+USER_SETTINGS = {
+    "SMTP_EMAIL": "",  # ex: "utd.ais@aisociety.io"
+    "SMTP_APP_PASSWORD": "",  # Gmail app password
+    "FIREBASE_SERVICE_ACCOUNT_PATH": "serviceAccountKey.json",
+    "FIREBASE_PROJECT_ID": "",
+    "FIREBASE_CLIENT_EMAIL": "",
+    "FIREBASE_PRIVATE_KEY": "",
+    "FIRESTORE_COLLECTION": "hackers",
+    "EMAIL_FOOTER_IMAGE_PATH": "public/Email/emailImage.png",
+    "EMAIL_FOOTER_IMAGE_URL": "https://www.hackai.org/Home/hackAiLogoColor.webp",
+    "DRY_RUN": False,
+    "COUNT_ONLY": False,
+    "TEST_MODE": False,
+    "TEST_RECEIVER_EMAIL": "",  # required when TEST_MODE=True
+    "SEND_DELAY_SECONDS": 2.0,
+    "BATCH_SIZE": 50,
+    "BATCH_PAUSE_SECONDS": 20.0,
+    "SEND_LIMIT": 0,  # 0 means no limit; 1 means only first eligible row
+    "TARGET_ACCESS_CODE": "",  # blank means all access codes
+    "FORCE_SEND_TARGET": False,  # if true with TARGET_ACCESS_CODE, bypasses already-sent/duplicate skip checks
+}
+
+
+@dataclass
+class CandidateRow:
+    doc_id: str
+    first_name: str
+    last_name: str
+    full_name: str
+    name_key: str
+    email: str
+    status: str
+    access_code: str
+    raw_data: Dict[str, Any]
+    doc_ref: Any
+
+
+@dataclass
+class SkippedRow:
+    doc_id: str
+    full_name: str
+    email: str
+    reason: str
+    detail: str = ""
+
+
+def parse_bool(value: str, default: bool = False) -> bool:
+    if value is None:
+        return default
+    raw = value.strip().lower()
+    if raw in {"1", "true", "yes", "y", "on"}:
+        return True
+    if raw in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
 
 
 def to_str(value: Any) -> str:
     return value if isinstance(value, str) else ""
+
+
+def normalize_email(value: str) -> str:
+    return value.strip().lower()
+
+
+def is_valid_email(value: str) -> bool:
+    return bool(EMAIL_RE.match(value))
+
+
+def normalize_name_part(value: str) -> str:
+    return " ".join(value.strip().lower().split())
 
 
 def load_env_local_file(env_file: str = ".env.local") -> None:
@@ -65,8 +135,8 @@ def load_env_local_file(env_file: str = ".env.local") -> None:
         key = key.strip()
         value = value.strip()
         if (
-            (value.startswith('"') and value.endswith('"')) or
-            (value.startswith("'") and value.endswith("'"))
+            (value.startswith('"') and value.endswith('"'))
+            or (value.startswith("'") and value.endswith("'"))
         ):
             value = value[1:-1]
         if key and key not in os.environ:
@@ -82,8 +152,8 @@ def get_by_keys(data: Dict[str, Any], keys: List[str]) -> str:
     return ""
 
 
-def get_access_code(data: Dict[str, Any]) -> str:
-    raw = data.get("access_code", data.get("accessCode", ""))
+def get_access_code(doc_id: str, data: Dict[str, Any]) -> str:
+    raw = data.get("access_code", data.get("accessCode", doc_id))
     return str(raw).strip()
 
 
@@ -92,7 +162,7 @@ def get_first_name(data: Dict[str, Any]) -> str:
     if first:
         return first
     full_name = get_by_keys(data, ["name", "fullName", "full_name", "displayName"])
-    return full_name.split(" ")[0] if full_name else "Hacker"
+    return full_name.split(" ")[0].strip() if full_name else ""
 
 
 def get_last_name(data: Dict[str, Any]) -> str:
@@ -100,49 +170,88 @@ def get_last_name(data: Dict[str, Any]) -> str:
     if last:
         return last
     full_name = get_by_keys(data, ["name", "fullName", "full_name", "displayName"])
-    parts = [p for p in full_name.split(" ") if p] if full_name else []
+    parts = [p.strip() for p in full_name.split(" ") if p.strip()] if full_name else []
     return parts[-1] if len(parts) > 1 else ""
 
 
-def get_recipients(data: Dict[str, Any]) -> List[str]:
-    emails = [
+def get_primary_email(data: Dict[str, Any]) -> str:
+    # Prefer canonical applicant email field.
+    candidates = [
         get_by_keys(data, ["email"]),
         get_by_keys(data, ["school_email", "schoolEmail"]),
         get_by_keys(data, ["personal_email", "personalEmail"]),
     ]
-    deduped: List[str] = []
-    seen = set()
-    for item in emails:
-        lowered = item.lower()
-        if item and lowered not in seen:
-            seen.add(lowered)
-            deduped.append(item)
-    return deduped
+    for candidate in candidates:
+        if candidate:
+            return normalize_email(candidate)
+    return ""
 
 
 def load_config() -> Dict[str, Any]:
+    def pick_str(key: str, default: str = "") -> str:
+        env_value = os.getenv(key)
+        if env_value is not None and env_value.strip() != "":
+            return env_value.strip()
+
+        configured = USER_SETTINGS.get(key, default)
+        if isinstance(configured, str):
+            return configured.strip()
+        if configured is None:
+            return default
+        return str(configured).strip()
+
+    def pick_bool(key: str, default: bool = False) -> bool:
+        env_value = os.getenv(key)
+        if env_value is not None:
+            return parse_bool(env_value, default=default)
+        return bool(USER_SETTINGS.get(key, default))
+
+    def pick_int(key: str, default: int) -> int:
+        env_value = os.getenv(key)
+        if env_value is not None and env_value.strip() != "":
+            try:
+                return int(env_value.strip())
+            except ValueError:
+                return default
+        configured = USER_SETTINGS.get(key, default)
+        try:
+            return int(configured)
+        except (TypeError, ValueError):
+            return default
+
+    def pick_float(key: str, default: float) -> float:
+        env_value = os.getenv(key)
+        if env_value is not None and env_value.strip() != "":
+            try:
+                return float(env_value.strip())
+            except ValueError:
+                return default
+        configured = USER_SETTINGS.get(key, default)
+        try:
+            return float(configured)
+        except (TypeError, ValueError):
+            return default
+
     cfg = {
-        "smtp_email": os.getenv("SMTP_EMAIL", REQUIRED_SENDER_EMAIL).strip(),
-        "smtp_password": os.getenv("SMTP_APP_PASSWORD", "").strip(),
-        "service_account_path": os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "serviceAccountKey.json").strip(),
-        "firebase_project_id": os.getenv("FIREBASE_PROJECT_ID", "").strip(),
-        "firebase_client_email": os.getenv("FIREBASE_CLIENT_EMAIL", "").strip(),
-        "firebase_private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").strip(),
-        "collection_name": os.getenv("FIRESTORE_COLLECTION", "hackers").strip(),
-        "target_access_code": os.getenv("TARGET_ACCESS_CODE", "100000").strip(),
-        "email_footer_image_path": os.getenv(
-            "EMAIL_FOOTER_IMAGE_PATH", "public/Email/emailImage.png"
-        ).strip(),
-        "email_footer_image_url": os.getenv(
-            "EMAIL_FOOTER_IMAGE_URL", "https://www.hackai.org/Home/hackAiLogoColor.webp"
-        ).strip(),
-        "dry_run": os.getenv("DRY_RUN", "true").strip().lower() != "false",
-        "count_only": os.getenv("COUNT_ONLY", "false").strip().lower() == "true",
-        "test_mode": os.getenv("TEST_MODE", "false").strip().lower() == "true",
-        "test_receiver": os.getenv("TEST_RECEIVER_EMAIL", "").strip(),
-        "delay_seconds": float(os.getenv("SEND_DELAY_SECONDS", "2.0")),
-        "batch_size": int(os.getenv("BATCH_SIZE", "50")),
-        "batch_pause_seconds": float(os.getenv("BATCH_PAUSE_SECONDS", "20")),
+        "smtp_email": pick_str("SMTP_EMAIL", ""),
+        "smtp_password": pick_str("SMTP_APP_PASSWORD", ""),
+        "service_account_path": pick_str("FIREBASE_SERVICE_ACCOUNT_PATH", "serviceAccountKey.json"),
+        "firebase_project_id": pick_str("FIREBASE_PROJECT_ID", ""),
+        "firebase_client_email": pick_str("FIREBASE_CLIENT_EMAIL", ""),
+        "firebase_private_key": pick_str("FIREBASE_PRIVATE_KEY", ""),
+        "collection_name": pick_str("FIRESTORE_COLLECTION", "hackers"),
+        "email_footer_image_path": pick_str("EMAIL_FOOTER_IMAGE_PATH", "public/Email/emailImage.png"),
+        "email_footer_image_url": pick_str("EMAIL_FOOTER_IMAGE_URL", "https://www.hackai.org/Home/hackAiLogoColor.webp"),
+        "dry_run": pick_bool("DRY_RUN", False),
+        "count_only": pick_bool("COUNT_ONLY", False),
+        "test_mode": pick_bool("TEST_MODE", False),
+        "test_receiver": pick_str("TEST_RECEIVER_EMAIL", ""),
+        "delay_seconds": pick_float("SEND_DELAY_SECONDS", 2.0),
+        "batch_size": pick_int("BATCH_SIZE", 50),
+        "batch_pause_seconds": pick_float("BATCH_PAUSE_SECONDS", 20.0),
+        "send_limit": pick_int("SEND_LIMIT", 0),
+        "target_access_code": pick_str("TARGET_ACCESS_CODE", ""),
+        "force_send_target": pick_bool("FORCE_SEND_TARGET", False),
     }
 
     if not cfg["service_account_path"] and not (
@@ -153,22 +262,25 @@ def load_config() -> Dict[str, Any]:
         )
     if not cfg["collection_name"]:
         raise ValueError("FIRESTORE_COLLECTION is required.")
-    if not cfg["target_access_code"]:
-        raise ValueError("TARGET_ACCESS_CODE is required.")
-    if cfg["smtp_email"].lower() != REQUIRED_SENDER_EMAIL:
-        raise ValueError(
-            f"SMTP_EMAIL must be {REQUIRED_SENDER_EMAIL}. Current value: {cfg['smtp_email']}"
-        )
-    if not cfg["dry_run"] and (not cfg["smtp_email"] or not cfg["smtp_password"]):
-        raise ValueError("SMTP_EMAIL and SMTP_APP_PASSWORD are required when DRY_RUN=false.")
     if cfg["test_mode"] and not cfg["test_receiver"]:
         raise ValueError("TEST_RECEIVER_EMAIL is required when TEST_MODE=true.")
     if cfg["batch_size"] <= 0:
         raise ValueError("BATCH_SIZE must be > 0.")
     if cfg["batch_pause_seconds"] < 0:
         raise ValueError("BATCH_PAUSE_SECONDS must be >= 0.")
+    if cfg["send_limit"] < 0:
+        raise ValueError("SEND_LIMIT must be >= 0.")
+    if not cfg["dry_run"] and (not cfg["smtp_email"] or not cfg["smtp_password"]):
+        raise ValueError("SMTP_EMAIL and SMTP_APP_PASSWORD are required when DRY_RUN=false.")
 
     return cfg
+
+
+def sort_key_for_access_code(value: str) -> Tuple[int, str]:
+    code = value.strip()
+    if code.isdigit():
+        return (0, f"{int(code):010d}")
+    return (1, code)
 
 
 def init_firestore(service_account_path: str):
@@ -201,16 +313,16 @@ def build_email(
     first_name: str,
     last_name: str,
     access_code: str,
-    status: str,
     footer_image_path: str,
     footer_image_url: str,
 ) -> EmailMessage:
     msg = EmailMessage()
-    msg["Subject"] = "🛹 HackAI 2026: Your Application Status & Event Details"
+    msg["Subject"] = EMAIL_SUBJECT
 
     full_name = f"{first_name} {last_name}".strip()
     if not full_name:
         full_name = "Hacker"
+
     footer_path = Path(footer_image_path)
     footer_cid = "hackai-footer-image"
     footer_img_src = f"cid:{footer_cid}" if footer_path.exists() else footer_image_url
@@ -290,7 +402,7 @@ Questions? Reach out anytime at utd.ais@aisociety.io.
       <li>Arrival: You may begin lining up at 7:00 AM.</li>
       <li>
         Admission from waitlist begins after accepted hackers are checked in and as space allows. While we
-        can&apos;t guarantee a spot for everyone, we will do our best to get as many of you in as possible!
+        can&apos;t guarantee a spot for everyone, we will do our best to get as many of you in as possible.
       </li>
     </ul>
 
@@ -309,11 +421,9 @@ Questions? Reach out anytime at utd.ais@aisociety.io.
     <p>
       Join the Discord:
       <a href="https://discord.gg/pxs9TtVV6v">https://discord.gg/pxs9TtVV6v</a>
-      - Connect with sponsors and other participants.
       <br />
       Follow us on Instagram:
       <a href="https://www.instagram.com/utdais/">https://www.instagram.com/utdais/</a>
-      - Stay in the loop with all AIS activities, and any extra information we may share!
     </p>
     <p>
       All communication during the event will be on Discord. If you are not on the Discord throughout the duration
@@ -356,79 +466,247 @@ def send_message(smtp_email: str, smtp_password: str, msg: EmailMessage) -> None
         smtp.send_message(msg)
 
 
+def mark_send_success(doc_ref: Any, to_email: str) -> None:
+    doc_ref.update(
+        {
+            "emailSentAt": firestore.SERVER_TIMESTAMP,
+            "emailSentTo": to_email,
+            "emailSentSubject": EMAIL_SUBJECT,
+            "emailSendStatus": "sent",
+            "emailSendError": firestore.DELETE_FIELD,
+        }
+    )
+
+
+def mark_send_failure(doc_ref: Any, error_text: str) -> None:
+    doc_ref.update(
+        {
+            "emailSendStatus": "failed",
+            "emailSendError": error_text[:1000],
+            "emailSendTriedAt": firestore.SERVER_TIMESTAMP,
+        }
+    )
+
+
+def export_skip_report(skipped: List[SkippedRow]) -> str:
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_dir = Path("csv")
+    report_dir.mkdir(parents=True, exist_ok=True)
+    path = report_dir / f"email_skip_report_{ts}.csv"
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["doc_id", "name", "email", "reason", "detail"])
+        for row in skipped:
+            writer.writerow([row.doc_id, row.full_name, row.email, row.reason, row.detail])
+    return str(path)
+
+
 def main() -> None:
     load_env_local_file()
     cfg = load_config()
     db = init_firestore(cfg["service_account_path"])
 
     users_ref = db.collection(cfg["collection_name"])
-    try:
-        docs = list(users_ref.stream(timeout=60))
-    except DeadlineExceeded:
-        print("Initial fetch timed out. Retrying once more...")
-        time.sleep(2)
-        docs = list(users_ref.stream(timeout=60))
+    if cfg["target_access_code"]:
+        targeted_snap = users_ref.document(cfg["target_access_code"]).get()
+        docs = [targeted_snap] if targeted_snap.exists else []
+    else:
+        try:
+            docs = list(users_ref.stream(timeout=60))
+        except DeadlineExceeded:
+            print("Initial fetch timed out. Retrying once more...")
+            time.sleep(2)
+            docs = list(users_ref.stream(timeout=60))
 
     print(f"Total rows loaded from {cfg['collection_name']}: {len(docs)}")
 
-    eligible_docs = []
-    for doc in docs:
-        user = doc.to_dict() or {}
-        access_code = get_access_code(user)
-        if access_code != cfg["target_access_code"]:
+    candidates: List[CandidateRow] = []
+    skipped: List[SkippedRow] = []
+    name_to_emails: Dict[str, set[str]] = {}
+    single_target_mode = bool(cfg["target_access_code"])
+    force_target_send = single_target_mode and bool(cfg["force_send_target"])
+
+    if single_target_mode and not docs:
+        skipped.append(
+            SkippedRow(
+                cfg["target_access_code"],
+                "Unknown",
+                "",
+                "target_not_found",
+                "No matching document found for TARGET_ACCESS_CODE.",
+            )
+        )
+
+    for doc_snap in docs:
+        data = doc_snap.to_dict() or {}
+        doc_id = doc_snap.id
+
+        first_name = get_first_name(data)
+        last_name = get_last_name(data)
+        full_name = f"{first_name} {last_name}".strip() or "Unknown"
+        name_key = f"{normalize_name_part(first_name)}::{normalize_name_part(last_name)}"
+
+        status = to_str(data.get("status", "")).strip().lower()
+        if status not in VALID_STATUSES:
+            skipped.append(
+                SkippedRow(doc_id, full_name, "", "invalid_status", f"status='{status}'")
+            )
             continue
 
-        recipients = get_recipients(user)
-        if not recipients:
+        email = get_primary_email(data)
+        if not email:
+            skipped.append(SkippedRow(doc_id, full_name, "", "missing_email", "no email field"))
+            continue
+        if not is_valid_email(email):
+            skipped.append(SkippedRow(doc_id, full_name, email, "invalid_email", "failed email format"))
             continue
 
-        status = to_str(user.get("status", "")).strip().lower()
-        if status not in {"accepted", "waitlist", "rejected"}:
+        if (not force_target_send) and (
+            data.get("emailSentAt") or data.get("email_sent_at") or data.get("lastEmailSentAt")
+        ):
+            skipped.append(
+                SkippedRow(
+                    doc_id,
+                    full_name,
+                    email,
+                    "already_sent",
+                    "emailSentAt/email_sent_at/lastEmailSentAt exists",
+                )
+            )
             continue
 
-        eligible_docs.append((doc, user, recipients, status, access_code))
+        access_code = get_access_code(doc_id, data)
+        if cfg["target_access_code"] and access_code != cfg["target_access_code"]:
+            skipped.append(
+                SkippedRow(
+                    doc_id,
+                    full_name,
+                    email,
+                    "target_access_code_mismatch",
+                    f"expected={cfg['target_access_code']} actual={access_code}",
+                )
+            )
+            continue
 
+        row = CandidateRow(
+            doc_id=doc_id,
+            first_name=first_name or "Hacker",
+            last_name=last_name,
+            full_name=full_name,
+            name_key=name_key,
+            email=email,
+            status=status,
+            access_code=access_code,
+            raw_data=data,
+            doc_ref=doc_snap.reference,
+        )
+        candidates.append(row)
+        if normalize_name_part(first_name) and normalize_name_part(last_name):
+            name_to_emails.setdefault(name_key, set()).add(email)
+
+    conflicting_name_keys = (
+        {key for key, emails in name_to_emails.items() if len(emails) > 1 and key != "::"}
+        if not force_target_send
+        else set()
+    )
+
+    eligible: List[CandidateRow] = []
+    seen_emails: set[str] = set()
+
+    for row in candidates:
+        if row.name_key in conflicting_name_keys:
+            skipped.append(
+                SkippedRow(
+                    row.doc_id,
+                    row.full_name,
+                    row.email,
+                    "duplicate_name_different_emails",
+                    "same first+last appears with different emails",
+                )
+            )
+            continue
+
+        if row.email in seen_emails and not force_target_send:
+            skipped.append(
+                SkippedRow(
+                    row.doc_id,
+                    row.full_name,
+                    row.email,
+                    "duplicate_email_in_run",
+                    "email already processed in this run",
+                )
+            )
+            continue
+
+        seen_emails.add(row.email)
+        eligible.append(row)
+
+    eligible.sort(key=lambda row: (sort_key_for_access_code(row.access_code), row.doc_id))
+
+    if cfg["send_limit"] > 0 and len(eligible) > cfg["send_limit"]:
+        overflow = eligible[cfg["send_limit"] :]
+        for row in overflow:
+            skipped.append(
+                SkippedRow(
+                    row.doc_id,
+                    row.full_name,
+                    row.email,
+                    "send_limit_overflow",
+                    f"SEND_LIMIT={cfg['send_limit']}",
+                )
+            )
+        eligible = eligible[: cfg["send_limit"]]
+
+    print(f"Eligible rows to process: {len(eligible)}")
     print(
-        f"Eligible rows (code={cfg['target_access_code']} and valid status+recipient): {len(eligible_docs)}"
+        f"Config: DRY_RUN={cfg['dry_run']} TEST_MODE={cfg['test_mode']} "
+        f"SEND_LIMIT={cfg['send_limit']} BATCH_SIZE={cfg['batch_size']} "
+        f"TARGET_ACCESS_CODE={cfg['target_access_code'] or 'ALL'} "
+        f"FORCE_SEND_TARGET={cfg['force_send_target']}"
     )
 
     if cfg["count_only"]:
         print("COUNT_ONLY=true, exiting without sending.")
+        report_path = export_skip_report(skipped)
+        print(f"Skip report written to: {report_path}")
         return
 
-    total = 0
+    attempted = 0
     sent = 0
     failed = 0
+    failed_rows: List[Tuple[str, str, str]] = []
 
-    for idx, (doc, user, recipients, status, access_code) in enumerate(eligible_docs, start=1):
+    for idx, row in enumerate(eligible, start=1):
         if idx > 1 and (idx - 1) % cfg["batch_size"] == 0:
             print(
-                f"Batch pause: processed {idx - 1} emails. Sleeping {cfg['batch_pause_seconds']}s..."
+                f"Batch pause: processed {idx - 1} rows. Sleeping {cfg['batch_pause_seconds']}s..."
             )
             time.sleep(cfg["batch_pause_seconds"])
 
-        first_name = get_first_name(user)
-        last_name = get_last_name(user)
+        attempted += 1
+
         msg = build_email(
-            first_name,
-            last_name,
-            access_code,
-            status,
+            row.first_name,
+            row.last_name,
+            row.access_code,
             cfg["email_footer_image_path"],
             cfg["email_footer_image_url"],
         )
-        msg["From"] = REQUIRED_SENDER_EMAIL
+        msg["From"] = cfg["smtp_email"] or "utd.ais@aisociety.io"
+
+        target_to = cfg["test_receiver"] if cfg["test_mode"] else row.email
+        msg["To"] = target_to
 
         if cfg["test_mode"]:
-            msg["To"] = cfg["test_receiver"]
             print(
-                f"[TEST_MODE] Would send to {recipients} (doc={doc.id}, name={first_name}) -> {cfg['test_receiver']}"
+                f"[TEST_MODE] doc={row.doc_id} name={row.full_name} email={row.email} "
+                f"status={row.status} access_code={row.access_code} -> {target_to}"
             )
         else:
-            msg["To"] = ", ".join(recipients)
-            print(f"Prepared email for doc={doc.id} -> {recipients}")
-
-        total += 1
+            print(
+                f"Sending doc={row.doc_id} name={row.full_name} email={row.email} "
+                f"status={row.status} access_code={row.access_code} to={target_to}"
+            )
 
         if cfg["dry_run"]:
             print("[DRY_RUN] Skipping actual send.")
@@ -436,19 +714,45 @@ def main() -> None:
 
         try:
             send_message(cfg["smtp_email"], cfg["smtp_password"], msg)
+            mark_send_success(row.doc_ref, row.email)
             sent += 1
             print("Email sent.")
         except Exception as exc:
             failed += 1
-            print(f"Failed for doc={doc.id}: {exc}")
+            error_text = str(exc)
+            failed_rows.append((row.doc_id, row.email, error_text))
+            print(f"Failed for doc={row.doc_id}: {error_text}")
+            try:
+                mark_send_failure(row.doc_ref, error_text)
+            except Exception as mark_exc:
+                print(f"Warning: could not mark failure in Firestore for doc={row.doc_id}: {mark_exc}")
 
         time.sleep(cfg["delay_seconds"])
 
-    print(
-        f"Done. Matched={total}, Sent={sent}, Failed={failed}, "
-        f"Collection={cfg['collection_name']}, AccessCode={cfg['target_access_code']}, "
-        f"DRY_RUN={cfg['dry_run']}, BatchSize={cfg['batch_size']}"
-    )
+    reason_counts: Dict[str, int] = {}
+    for row in skipped:
+        reason_counts[row.reason] = reason_counts.get(row.reason, 0) + 1
+
+    report_path = export_skip_report(skipped)
+
+    print("\n=== Email Send Summary ===")
+    print(f"Collection: {cfg['collection_name']}")
+    print(f"Loaded rows: {len(docs)}")
+    print(f"Attempted: {attempted}")
+    print(f"Sent: {sent}")
+    print(f"Failed: {failed}")
+    print(f"Skipped: {len(skipped)}")
+    print(f"Skip report: {report_path}")
+
+    if reason_counts:
+        print("\nSkipped by reason:")
+        for reason in sorted(reason_counts.keys()):
+            print(f"- {reason}: {reason_counts[reason]}")
+
+    if failed_rows:
+        print("\nFailures:")
+        for doc_id, email, err in failed_rows:
+            print(f"- doc={doc_id} email={email} error={err}")
 
 
 if __name__ == "__main__":

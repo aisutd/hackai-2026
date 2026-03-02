@@ -3,10 +3,10 @@
 Update hackers statuses to accepted from a CSV file.
 
 Default behavior:
-- Uses scripts/HackAI Preliminary Sort - Acceptances.csv
+- Uses csv/HackAI Preliminary Sort - Acceptances.csv
 - Processes all CSV rows
 - Applies updates immediately (no dry run)
-- Writes unmatched rows report to scripts/unmatched_acceptance_rows.csv
+- Writes unmatched rows report to csv/unmatched_acceptance_rows.csv
 */
 
 const fs = require("fs");
@@ -15,8 +15,9 @@ const { initializeApp, cert, getApps } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 const SCRIPT_DIR = __dirname;
-const DEFAULT_CSV_PATH = path.join(SCRIPT_DIR, "HackAI Preliminary Sort - Acceptances.csv");
-const DEFAULT_UNMATCHED_PATH = path.join(SCRIPT_DIR, "unmatched_acceptance_rows.csv");
+const CSV_DIR = path.resolve(SCRIPT_DIR, "../csv");
+const DEFAULT_CSV_PATH = path.join(CSV_DIR, "HackAI Preliminary Sort - Acceptances.csv");
+const DEFAULT_UNMATCHED_PATH = path.join(CSV_DIR, "unmatched_acceptance_rows.csv");
 const DEFAULT_COLLECTION = "hackers";
 const DEFAULT_LIMIT = 0;
 
