@@ -204,7 +204,7 @@ export default async function handler(
 
     const decoded = await adminAuth.verifyIdToken(token, true);
     const callerEmail = normalizeString(decoded.email).toLowerCase();
-    const adminEmail = normalizeString(process.env.ADMIN_EMAIL).toLowerCase();
+    const adminEmail = normalizeString(process.env.NEXT_PUBLIC_ADMIN_EMAIL).toLowerCase();
     if (!adminEmail) {
       return res.status(500).json({
         ok: false,
