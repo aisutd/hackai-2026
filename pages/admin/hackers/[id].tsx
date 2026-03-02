@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
-import { FaArrowLeft, FaHistory, FaQrcode, FaSave, FaUserCircle } from "react-icons/fa";
+import { FaArrowLeft, FaHistory, FaQrcode, FaSave, FaUserCircle, FaEnvelope } from "react-icons/fa";
 import {
   Timestamp,
   collection,
@@ -207,6 +207,9 @@ function HackerAdminDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailActionError, setEmailActionError] = useState("");
+  const [emailActionSuccess, setEmailActionSuccess] = useState("");
   const [hackerData, setHackerData] = useState<Record<string, unknown> | null>(null);
   const [editableFields, setEditableFields] = useState<EditableField[]>([]);
   const [scanRows, setScanRows] = useState<HackerScan[]>([]);
@@ -233,6 +236,8 @@ function HackerAdminDetailPage() {
       setLoading(true);
       setError("");
       setSaveMessage("");
+      setEmailActionError("");
+      setEmailActionSuccess("");
       setIsEditing(false);
       try {
         const hackerRef = doc(db, HACKERS_COLLECTION, hackerId);
@@ -321,6 +326,47 @@ function HackerAdminDetailPage() {
   const email = useMemo(() => toSafeString(hackerData?.email).trim(), [hackerData]);
   const qrPayload = email || hackerId;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(qrPayload)}`;
+
+  const sendProfileEmail = async () => {
+    if (!hackerId || !email) return;
+
+    setEmailActionError("");
+    setEmailActionSuccess("");
+    setSendingEmail(true);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("Please sign in again, then retry.");
+      }
+
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/admin/sendHackerEmail", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ hackerId }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "Unable to send email.");
+      }
+
+      setEmailActionSuccess(`Email sent to ${email}.`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to send email.";
+      setEmailActionError(message);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   const updateField = (fieldKey: string, nextValue: string | boolean) => {
     if (!isEditing) return;
@@ -461,6 +507,23 @@ function HackerAdminDetailPage() {
                       <div>
                         <h1 className="text-2xl font-bold">{getDisplayName(hackerId, hackerData)}</h1>
                         <div className="text-sm text-gray-300 break-all">{email || "No email found"}</div>
+                        {email && (
+                          <button
+                            type="button"
+                            onClick={sendProfileEmail}
+                            disabled={sendingEmail}
+                            className="mt-2 inline-flex items-center gap-2 rounded-lg px-3 py-2 border border-white/20 bg-black/35 text-white hover:bg-white/10 text-sm"
+                          >
+                            <FaEnvelope />
+                            {sendingEmail ? "Sending..." : "Send Email"}
+                          </button>
+                        )}
+                        {emailActionSuccess && (
+                          <div className="mt-2 text-xs text-green-300">{emailActionSuccess}</div>
+                        )}
+                        {emailActionError && (
+                          <div className="mt-2 text-xs text-red-300">{emailActionError}</div>
+                        )}
                       </div>
                     </div>
                     <div className="text-xs text-gray-400 break-all mb-4">Doc ID: {hackerId}</div>
@@ -486,44 +549,46 @@ function HackerAdminDetailPage() {
                   <div className="lg:col-span-2 rounded-2xl border border-white/15 bg-black/30 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                       <h2 className="text-xl font-semibold">Editable Information</h2>
-                      {!isEditing ? (
-                        <button
-                          type="button"
-                          onClick={startEditing}
-                          disabled={saving || deleting}
-                          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-[#2d0a4b] text-white font-semibold transition hover:bg-[#4b1c7a]"
-                        >
-                          Edit
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {!isEditing ? (
                           <button
                             type="button"
-                            onClick={cancelEditing}
+                            onClick={startEditing}
                             disabled={saving || deleting}
-                            className="rounded-xl px-4 py-2 border border-white/20 bg-black/35 text-white font-semibold transition hover:bg-white/10 disabled:opacity-70"
+                            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-[#2d0a4b] text-white font-semibold transition hover:bg-[#4b1c7a]"
                           >
-                            Cancel
+                            Edit
                           </button>
-                          <button
-                            type="button"
-                            onClick={deleteProfile}
-                            disabled={saving || deleting}
-                            className="rounded-xl px-4 py-2 bg-red-700/90 text-white font-semibold transition hover:bg-red-600 disabled:opacity-70"
-                          >
-                            {deleting ? "Deleting..." : "Delete Profile"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={saveProfile}
-                            disabled={saving || deleting}
-                            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-[#2d0a4b] text-white font-semibold transition hover:bg-[#4b1c7a] disabled:opacity-70"
-                          >
-                            <FaSave />
-                            {saving ? "Saving..." : "Save Changes"}
-                          </button>
-                        </div>
-                      )}
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={cancelEditing}
+                              disabled={saving || deleting}
+                              className="rounded-xl px-4 py-2 border border-white/20 bg-black/35 text-white font-semibold transition hover:bg-white/10 disabled:opacity-70"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={deleteProfile}
+                              disabled={saving || deleting}
+                              className="rounded-xl px-4 py-2 bg-red-700/90 text-white font-semibold transition hover:bg-red-600 disabled:opacity-70"
+                            >
+                              {deleting ? "Deleting..." : "Delete Profile"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={saveProfile}
+                              disabled={saving || deleting}
+                              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-[#2d0a4b] text-white font-semibold transition hover:bg-[#4b1c7a] disabled:opacity-70"
+                            >
+                              <FaSave />
+                              {saving ? "Saving..." : "Save Changes"}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     {editableFields.length === 0 && (
                       <div className="text-sm text-gray-300">No scalar fields available to edit.</div>

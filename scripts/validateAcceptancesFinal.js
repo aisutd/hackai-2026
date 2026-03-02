@@ -3,12 +3,12 @@
 Validate that hackers listed in a CSV are marked accepted in Firestore.
 
 Default behavior:
-- Uses scripts/HackAI Preliminary Sort - Acceptances-final.csv
+- Uses csv/HackAI Preliminary Sort - Acceptances-final.csv
 - Processes all CSV rows
 - Reads collection: hackers
 - Matches by first + last + email
 - Reports rows that are unmatched or not accepted
-- Writes report to scripts/validation_acceptance_issues.csv
+- Writes report to csv/validation_acceptance_issues.csv
 */
 
 const fs = require("fs");
@@ -17,8 +17,9 @@ const { initializeApp, cert, getApps } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 
 const SCRIPT_DIR = __dirname;
-const DEFAULT_CSV_PATH = path.join(SCRIPT_DIR, "HackAI Preliminary Sort - Acceptances-final.csv");
-const DEFAULT_REPORT_PATH = path.join(SCRIPT_DIR, "validation_acceptance_issues.csv");
+const CSV_DIR = path.resolve(SCRIPT_DIR, "../csv");
+const DEFAULT_CSV_PATH = path.join(CSV_DIR, "HackAI Preliminary Sort - Acceptances-final.csv");
+const DEFAULT_REPORT_PATH = path.join(CSV_DIR, "validation_acceptance_issues.csv");
 const DEFAULT_COLLECTION = "hackers";
 const DEFAULT_LIMIT = 0;
 
@@ -430,4 +431,3 @@ main().catch((err) => {
   console.error("Validation failed:", err);
   process.exit(1);
 });
-

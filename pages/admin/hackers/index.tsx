@@ -162,6 +162,7 @@ function AdminHackersPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [loggedInFilter, setLoggedInFilter] = useState<"all" | "true" | "false">("all");
   const [checkedInFilter, setCheckedInFilter] = useState<"all" | "true" | "false">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "accepted" | "rejected" | "waitlist">("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -251,10 +252,14 @@ function AdminHackersPage() {
         checkedInFilter === "all" ||
         (checkedInFilter === "true" ? hacker.isCheckedIn : !hacker.isCheckedIn);
 
+      const matchesLoggedIn =
+        loggedInFilter === "all" ||
+        (loggedInFilter === "true" ? hacker.hasLoggedIn : !hacker.hasLoggedIn);
+
       const matchesStatus =
         statusFilter === "all" || hacker.status === statusFilter;
 
-      return matchesSearch && matchesCheckedIn && matchesStatus;
+      return matchesSearch && matchesCheckedIn && matchesLoggedIn && matchesStatus;
     });
 
     if (statusFilter === "waitlist") {
@@ -267,7 +272,7 @@ function AdminHackersPage() {
     }
 
     return filtered;
-  }, [checkedInFilter, hackers, searchText, statusFilter]);
+  }, [checkedInFilter, hackers, loggedInFilter, searchText, statusFilter]);
 
   const waitlistOrderById = useMemo(() => {
     const map = new Map<string, number>();
@@ -280,7 +285,7 @@ function AdminHackersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [checkedInFilter, searchText, statusFilter]);
+  }, [checkedInFilter, loggedInFilter, searchText, statusFilter]);
 
   const totalPages = useMemo(() => {
     const pages = Math.ceil(filteredHackers.length / ITEMS_PER_PAGE);
@@ -606,7 +611,20 @@ function AdminHackersPage() {
             />
           </div>
 
-          <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="mb-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <label className="block">
+              <div className="text-xs uppercase tracking-widest text-gray-300 mb-1">Has Logged In</div>
+              <select
+                value={loggedInFilter}
+                onChange={(e) => setLoggedInFilter(e.target.value as "all" | "true" | "false")}
+                className="w-full rounded-xl px-4 py-3 bg-black/35 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#a259ff]"
+              >
+                <option value="all" className="text-black">All</option>
+                <option value="true" className="text-black">True</option>
+                <option value="false" className="text-black">False</option>
+              </select>
+            </label>
+
             <label className="block">
               <div className="text-xs uppercase tracking-widest text-gray-300 mb-1">Checked In</div>
               <select
