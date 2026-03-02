@@ -199,6 +199,9 @@ function AdminHackersPage() {
   const [sendingWaitlistRange, setSendingWaitlistRange] = useState(false);
   const [waitlistRangeError, setWaitlistRangeError] = useState("");
   const [waitlistRangeSuccess, setWaitlistRangeSuccess] = useState("");
+  const [assigningFoodGroups, setAssigningFoodGroups] = useState(false);
+  const [foodGroupResult, setFoodGroupResult] = useState("");
+  const [foodGroupError, setFoodGroupError] = useState("");
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -526,6 +529,48 @@ function AdminHackersPage() {
     }
   };
 
+  const handleAssignFoodGroups = async () => {
+    const confirmed = window.confirm(
+      "This will randomly assign half of all checked-in hackers to Food Group B (the other half stays A). Continue?"
+    );
+    if (!confirmed) return;
+
+    setFoodGroupResult("");
+    setFoodGroupError("");
+    setAssigningFoodGroups(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("Please sign in again, then retry.");
+      }
+      const token = await user.getIdToken();
+      const response = await fetch("/api/admin/assignFoodGroups", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        totalCheckedIn?: number;
+        assignedB?: number;
+      };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "Unable to assign food groups.");
+      }
+      setFoodGroupResult(payload.message || "Food groups assigned.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to assign food groups.";
+      setFoodGroupError(message);
+    } finally {
+      setAssigningFoodGroups(false);
+    }
+  };
+
   const renderPagination = (wrapperClassName: string) => (
     <div className={wrapperClassName}>
       <div className="text-sm text-gray-300">
@@ -628,6 +673,14 @@ function AdminHackersPage() {
               </button>
               <button
                 type="button"
+                onClick={handleAssignFoodGroups}
+                disabled={assigningFoodGroups || viewMode === "waitlistQueue"}
+                className="rounded-xl px-4 py-3 bg-[#8B5E3C] text-white font-semibold transition hover:bg-[#A0744F] disabled:opacity-60"
+              >
+                {assigningFoodGroups ? "Assigning..." : "Assign Food Groups"}
+              </button>
+              <button
+                type="button"
                 onClick={() => router.push("/scanner")}
                 className="rounded-xl px-4 py-3 bg-[#2d0a4b] text-white font-semibold transition hover:bg-[#4b1c7a]"
               >
@@ -635,6 +688,17 @@ function AdminHackersPage() {
               </button>
             </div>
           </div>
+
+          {foodGroupResult && (
+            <div className="mb-4 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+              {foodGroupResult}
+            </div>
+          )}
+          {foodGroupError && (
+            <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {foodGroupError}
+            </div>
+          )}
 
           {viewMode === "all" && showManualAdd && (
             <div className="mb-5 rounded-2xl border border-white/20 bg-black/30 p-4 md:p-5">
