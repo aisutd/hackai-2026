@@ -31,6 +31,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <div className={`${octin.variable} ${streetFlow.variable}`}>
+      <Head>
+        <link rel="icon" href="/tabLogo.webp" />
+      </Head>
       {/* {loading && router.pathname === '/' ? (
         <Preloader onDone={() => setLoading(false)} minDuration={800} />
       ) : ( */}
