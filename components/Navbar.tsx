@@ -12,6 +12,14 @@ const Navbar = () => {
   const adminMenuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
 
+  const NAV = [
+    { label: "ABOUT", id: "about" },
+    { label: "COUNTDOWN", id: "countdown" },
+    { label: "STATS", id: "stats" },
+    { label: "SPEAKER", id: "keynote" },
+    { label: "SPONSORS", id: "sponsors" },
+  ];
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setIsLoggedIn(!!user);
@@ -19,16 +27,6 @@ const Navbar = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  const NAV = [
-    { label: "ABOUT", id: "about" },
-    { label: "COUNTDOWN", id: "countdown" },
-    { label: "STATS", id: "stats" },
-    // { label: "TRACKS", id: "tracks" },
-    { label: "SPEAKER", id: "keynote" },
-    { label: "SPONSORS", id: "sponsors" }
-    ,
-  ];
 
   const scrollToId = (id: string) => {
     if (router.pathname === "/") {
@@ -69,8 +67,8 @@ const Navbar = () => {
 
   useEffect(() => {
     const closeOnOutsideClick = (e: MouseEvent) => {
-      if (!adminMenuRef.current) return;
-      if (!adminMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (adminMenuRef.current && !adminMenuRef.current.contains(target)) {
         setAdminMenuOpen(false);
       }
     };
@@ -131,6 +129,36 @@ const Navbar = () => {
                 {item.label}
               </button>
             ))}
+
+            {/* New additions (direct links) intentionally disabled per request.
+            {/* <button
+              type="button"
+              onClick={() => {
+                router.push("/menu");
+                setOpen(false);
+              }}
+              className="py-2 text-[1.05rem] lg:text-[1.2rem] leading-none text-white cursor-pointer flex justify-center rounded-[20px] bg-transparent transition-colors duration-500 ease-in-out hover:text-[#783edc] tracking-[0.08em]"
+              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
+              >
+              MENU
+            </button> */}
+
+            {/*
+            {QUICK_LINKS.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  openQuickLink(item.href);
+                  setOpen(false);
+                }}
+                className="py-2 text-[1.05rem] lg:text-[1.2rem] leading-none text-white cursor-pointer flex justify-center rounded-[20px] bg-transparent transition-colors duration-500 ease-in-out hover:text-[#783edc] tracking-[0.08em]"
+                style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
+              >
+                {item.label.toUpperCase()}
+              </button>
+            ))}
+            */}
 
             {isAdmin && (
               <div className="relative" ref={adminMenuRef}>
@@ -223,7 +251,7 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() =>
-                  window.open("https://discord.gg/756atmKkAq", "_blank")
+                  window.open("https://discord.gg/Q7hsRpDkRM", "_blank")
                 }
                 aria-label="Discord"
                 className="text-white hover:text-[#5865F2] transition-colors duration-300"
@@ -299,6 +327,36 @@ const Navbar = () => {
                 {item.label}
               </button>
             ))}
+
+            {/* New additions (direct links) intentionally disabled per request.
+            {/* <button
+              type="button"
+              onClick={() => {
+                router.push("/menu");
+                setOpen(false);
+              }}
+              className="text-left text-white/90 hover:text-white transition-colors text-base tracking-widest uppercase"
+              style={{ fontFamily: "Street Flow NYC" }}
+            >
+              Menu
+            </button> */}
+
+            {/*
+            {QUICK_LINKS.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  openQuickLink(item.href);
+                  setOpen(false);
+                }}
+                className="text-left text-white/90 hover:text-white transition-colors text-base tracking-widest uppercase"
+                style={{ fontFamily: "Street Flow NYC" }}
+              >
+                {item.label}
+              </button>
+            ))}
+            */}
 
             {/* Sign In/Out button for mobile */}
             {isLoggedIn || isAdmin ? (

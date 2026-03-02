@@ -16,7 +16,7 @@ const Footer = ({
   aisLogoSrc = "/footer/AISLogo.svg",
   instagramHref = "https://www.instagram.com/utdais/",
   linkedinHref = "https://www.linkedin.com/company/ais-utd/",
-  discordHref = "https://discord.gg/3VSEQv7ncR",
+  discordHref = "https://discord.gg/Q7hsRpDkRM",
 }: FooterProps) => {
   return (
     <footer className="w-full text-white border-t border-white/20"

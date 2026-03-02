@@ -86,11 +86,6 @@ const SignIn = () => {
     return hasPhone ? "/userProfile" : "/completeProfile";
   }, [getHackersByEmail]);
 
-  const hasRegisteredHackerByEmail = useCallback(async (rawEmail: string, excludeDocId?: string) => {
-    const matches = await getHackersByEmail(rawEmail);
-    return matches.some((item) => item.id !== excludeDocId && getHasLoggedIn(item.data));
-  }, [getHackersByEmail]);
-
   const enforceAllowedLogin = useCallback(async (rawEmail: string): Promise<"admin" | "user" | "blocked"> => {
     const email = rawEmail.trim().toLowerCase();
     if (!email) return "blocked";
@@ -186,7 +181,6 @@ const SignIn = () => {
         setLoading(false);
         return { ok: false };
       }
-      setEmail(applicantEmail);
       setLoading(false);
       return { ok: true, codeStr, applicantEmail };
     } catch {
@@ -201,6 +195,7 @@ const SignIn = () => {
     e.preventDefault();
     if (mode === "register") {
       const codeStr = code.join("");
+      const enteredEmail = email.trim().toLowerCase();
       let normalizedEmail = "";
 
       if (codeStr.length !== 6) {
@@ -212,6 +207,16 @@ const SignIn = () => {
       if (!codeResult.ok) return;
       normalizedEmail = codeResult.applicantEmail;
 
+      if (!isValidEmail(enteredEmail)) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+
+      if (enteredEmail !== normalizedEmail) {
+        setError(`This code is linked to ${normalizedEmail}. Please use that email.`);
+        return;
+      }
+
       if (!isValidEmail(normalizedEmail)) {
         setError("Invalid email. Please use the one you used on the application.");
         return;
@@ -221,27 +226,12 @@ const SignIn = () => {
         return;
       }
 
-      const applicantMatches = await getHackersByEmail(normalizedEmail);
-      if (applicantMatches.length === 0) {
-        setError("This email was not found in applications. Please use the email you applied with.");
-        return;
-      }
-
-      if (await hasRegisteredHackerByEmail(normalizedEmail, codeStr.length === 6 ? codeStr : undefined)) {
-        setError("This email already has an account. Please sign in instead.");
-        return;
-      }
-
       setError("");
       setLoading(true);
       try {
         isAuthGuardPausedRef.current = true;
         await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-        await Promise.all(
-          applicantMatches.map((match) =>
-            updateDoc(doc(db, HACKERS_COLLECTION, match.id), { hasLoggedIn: true })
-          )
-        );
+        await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
         isAuthGuardPausedRef.current = false;
         const nextRoute = await resolveUserDestination(normalizedEmail);
         router.replace(nextRoute);
@@ -253,11 +243,7 @@ const SignIn = () => {
         if (code === "auth/email-already-in-use") {
           try {
             await signInWithEmailAndPassword(auth, normalizedEmail, password);
-            await Promise.all(
-              applicantMatches.map((match) =>
-                updateDoc(doc(db, HACKERS_COLLECTION, match.id), { hasLoggedIn: true })
-              )
-            );
+            await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
             isAuthGuardPausedRef.current = false;
             const nextRoute = await resolveUserDestination(normalizedEmail);
             router.replace(nextRoute);
@@ -403,11 +389,6 @@ const SignIn = () => {
 
     if (!isValidEmail(expectedEmail)) {
       setError("This code is not linked to a valid email account.");
-      return;
-    }
-
-    if (await hasRegisteredHackerByEmail(expectedEmail, codeStr)) {
-      setError("This email already has an account. Please sign in instead.");
       return;
     }
 
