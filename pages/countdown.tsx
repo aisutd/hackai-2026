@@ -31,16 +31,13 @@ function pad2(n: number) {
 
 export default function CountdownHero({
   target,
-  leftGraffitiSrc,
-  rightGraffitiSrc,
-  frameSrc,
+  leftGraffitiSrc = "/Countdown/bunny.svg",
+  rightGraffitiSrc = "/Countdown/target.svg" ,
+  frameSrc = "/Countdown/countdownBg.svg",
   heightClassName = "h-[740px] md:h-[460px]",
   title = "Countdown",
   footerText = "till hacking begins",
 }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const targetMs = useMemo(() => {
     if (target != null) return toMs(target);
     return nextMarch7Local(9, 0, 0).getTime();
@@ -60,23 +57,29 @@ export default function CountdownHero({
   const mins = Math.floor((totalSec % (60 * 60)) / 60);
   const secs = totalSec % 60;
 
-  const safeDays = mounted ? String(days).padStart(2, "0") : "--";
-  const safeHours = mounted ? pad2(hours) : "--";
-  const safeMins = mounted ? pad2(mins) : "--";
-  const safeSecs = mounted ? pad2(secs) : "--";
+  const safeDays = String(days).padStart(2, "0");
+  const safeHours = pad2(hours);
+  const safeMins = pad2(mins);
+  const safeSecs = pad2(secs);
 
   return (
-    <section className={`relative w-full overflow-hidden ${heightClassName}`}>
+    <section className={`relative w-full overflow-hidden ${heightClassName}`}
+    style={{
+      backgroundImage: "url('/Countdown/bg-graffiti.svg')",
+      backgroundSize: "contain",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat"
+    }}>
       {/* graffiti overlays */}
       {leftGraffitiSrc && (
         <img
           src={leftGraffitiSrc}
           alt=""
           className={[
-            "pointer-events-none absolute z-[5] opacity-90",
-            "left-1 top-3 w-[64px]", // phones
-            "sm:left-3 sm:top-8 sm:w-[120px]",
-            "md:left-8 md:top-16 md:w-[220px]",
+            "pointer-events-none absolute z-5 opacity-90",
+            "left-1 top-3 w-16", // phones
+            "sm:left-3 sm:top-8 sm:w-30",
+            "md:left-8 md:top-16 md:w-55",
           ].join(" ")}
           draggable={false}
         />
@@ -87,10 +90,10 @@ export default function CountdownHero({
           src={rightGraffitiSrc}
           alt=""
           className={[
-            "pointer-events-none absolute z-[5] opacity-90",
-            "right-1 top-1 w-[72px]", // phones
-            "sm:right-3 sm:top-4 sm:w-[140px]",
-            "md:right-8 md:top-8 md:w-[260px]",
+            "pointer-events-none absolute z-5 opacity-90",
+            "right-1 top-1 w-18", // phones
+            "sm:right-3 sm:top-4 sm:w-35",
+            "md:right-8 md:top-8 md:w-65",
           ].join(" ")}
           draggable={false}
         />
@@ -98,8 +101,8 @@ export default function CountdownHero({
 
       <div className="relative z-10 flex h-full w-full flex-col items-center justify-start sm:justify-center px-3 sm:px-4 pt-6 sm:pt-0">
         <h2
-          className="mb-4 sm:mb-6 md:mb-8 text-white text-4xl sm:text-5xl md:text-6xl font-extrabold drop-shadow-[0_4px_0_rgba(0,0,0,0.85)] tracking-wide"
-          style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "1px black" }}
+          className="mb-4 sm:mb-6 md:mb-8 text-white text-4xl sm:text-5xl md:text-6xl drop-shadow-[0_4px_0_rgba(0,0,0,0.85)] tracking-wide"
+          style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "6px black", paintOrder: "stroke" }}
         >
           {title}
         </h2>
@@ -121,7 +124,7 @@ export default function CountdownHero({
             draggable={false}
           />
 
-          <div className="relative w-full px-[34px] py-[28px] md:px-[62px] md:py-[44px]">
+          <div className="relative w-full px-8.5 py-7 md:px-15.5 md:py-11">
             <div className="flex items-end justify-center gap-8 md:gap-10">
               <Block value={safeDays} label="days" />
               <DotColon />
@@ -137,8 +140,8 @@ export default function CountdownHero({
         <div className="relative mt-5 sm:mt-7 w-[min(980px,94vw)]">
           <div className="absolute right-0 top-0 flex items-center gap-2">
             <p
-              className="text-emerald-200 text-lg sm:text-xl md:text-3xl font-extrabold drop-shadow-[0_3px_0_rgba(0,0,0,0.85)]"
-              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "1px black" }}
+              className="text-emerald-200 text-lg sm:text-xl md:text-3xl drop-shadow-[0_3px_0_rgba(0,0,0,0.85)]"
+              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "3px black", paintOrder: "stroke" }}
             >
               {footerText}
             </p>
@@ -189,7 +192,7 @@ function DotColon() {
 
 function Block({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col items-center w-[140px] sm:w-[150px] md:w-[190px]">
+    <div className="flex flex-col items-center w-35 sm:w-37.5 md:w-47.5">
       <div className="relative">
         <div
           className="glitch leading-none text-[72px] sm:text-[88px] md:text-[112px] text-white"

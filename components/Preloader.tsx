@@ -3,27 +3,34 @@ import Image from "next/image";
 
 type PreloaderProps = {
   onDone: () => void;
+  minDuration?: number;
 };
 
-export default function Preloader({ onDone }: PreloaderProps) {
+export default function Preloader({ onDone, minDuration = 800 }: PreloaderProps) {
   const finishedRef = useRef(false);
+  const startTimeRef = useRef(Date.now());
 
   const finishOnce = () => {
     if (finishedRef.current) return;
+    const elapsed = Date.now() - startTimeRef.current;
+    if (elapsed < minDuration) {
+      setTimeout(() => finishOnce(), minDuration - elapsed);
+      return;
+    }
     finishedRef.current = true;
     onDone();
   };
 
-  // Fallback in case animationend doesn't fire (reduced motion, etc.)
+  // Fallback in case nothing triggers finish
   useEffect(() => {
-    const id = window.setTimeout(() => finishOnce(), 4000);
+    const id = window.setTimeout(() => finishOnce(), 2000);
     return () => window.clearTimeout(id);
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[9999] pointer-events-none bg-black">
+    <div className="fixed inset-0 z-9999 pointer-events-none bg-black">
       {/* Content */}
-      <div className="pt-[5rem] absolute inset-0 z-1 flex h-full items-center justify-center flex-col pointer-events-auto">
+      <div className="pt-20 absolute inset-0 z-1 flex h-full items-center justify-center flex-col pointer-events-auto">
         
 
         <Image
@@ -33,6 +40,7 @@ export default function Preloader({ onDone }: PreloaderProps) {
           height={200}
           priority
           className="fade-in relative z-10"
+          onLoadingComplete={finishOnce}
         />
 
         <div className="flex flex-col items-center text-[#fff9f5] font-allerta gap-2 fade-in">

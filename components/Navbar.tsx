@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useState } from "react";
 import { FaInstagram, FaDiscord, FaLinkedin } from "react-icons/fa";
 import Image from "next/image";
@@ -9,12 +7,11 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
 
   const NAV = [
-    { label: "HOME", id: "home" },
     { label: "ABOUT", id: "about" },
     { label: "COUNTDOWN", id: "countdown" },
     { label: "STATS", id: "stats" },
     { label: "DONORS", id: "donors" },
-    { label: "FAQS", id: "faqs" },
+    { label: "SPEAKER", id: "keynote" },
   ];
 
   const scrollToId = (id: string) => {
@@ -57,9 +54,9 @@ const Navbar = () => {
           outline: "1.5px solid rgba(255,255,255,0.18)",
         }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between w-full">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Use scrollToId so it respects your offset */}
             <button
               type="button"
@@ -67,21 +64,19 @@ const Navbar = () => {
                 scrollToId("home");
                 setOpen(false);
               }}
-              className="relative h-10 w-24"
+              className="relative h-10 w-24 cursor-pointer"
               aria-label="Go to home"
             >
-              <Image
-                src="/Home/hackAiLogo.svg"
+              <img
+                src="/Home/hackAiLogoColor.webp"
                 alt="HackAI"
-                fill
-                className="object-contain"
-                priority
+                className="object-contain w-full h-full"
               />
             </button>
           </div>
 
           {/* Desktop Links */}
-          <div className="hidden md:flex items-center gap-10">
+          <div className="hidden md:flex items-center gap-6">
             {NAV.map((item) => (
               <button
                 key={item.id}
@@ -90,8 +85,8 @@ const Navbar = () => {
                   scrollToId(item.id);
                   setOpen(false);
                 }}
-                className="py-2 px-4 text-white cursor-pointer flex justify-center font-bold rounded-[20px] bg-transparent transition-colors duration-500 ease-in-out hover:text-[#783edc] tracking-widest"
-                style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "0.5px black" }}
+                className="py-2 text-white cursor-pointer flex justify-center rounded-[20px] bg-transparent transition-colors duration-500 ease-in-out hover:text-[#783edc] tracking-widest"
+                style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "3px black", paintOrder: "stroke" }}
               >
                 {item.label}
               </button>
@@ -108,9 +103,9 @@ const Navbar = () => {
             </Link> */}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             {/* Desktop socials */}
-            <div className="hidden sm:flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-4 px-4">
               <button
                 type="button"
                 onClick={() =>
@@ -177,7 +172,7 @@ const Navbar = () => {
       </nav>
 
       {/* Mobile dropdown (ensure it's ABOVE the backdrop) */}
-      <div className="md:hidden mx-auto w-[min(1100px,calc(100%-2rem))] relative z-55">
+      <div className="md:hidden mx-auto w-[min(1100px,calc(100%-2rem))] relative z-[55]">
         <div
           className={`mt-3 overflow-hidden rounded-3xl bg-black/50 backdrop-blur-md border border-white/15 transition-all duration-200 ${
             open
@@ -257,7 +252,7 @@ const Navbar = () => {
           type="button"
           aria-label="Close menu"
           onClick={() => setOpen(false)}
-          className="md:hidden fixed inset-0 bg-black/30 z-54"
+          className="md:hidden fixed inset-0 bg-black/30 z-[54]"
         />
       )}
     </header>
