@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef } from "react";
 
-type StatItem = { src: string; alt: string; text: string };
+type StatItem = { src: string; alt: string; text: string | React.ReactNode };
 
 const StatCard = ({ src, alt, text }: StatItem) => (
   <div className="snap-center shrink-0 w-[135%] max-w-md">
@@ -17,13 +17,12 @@ const StatCard = ({ src, alt, text }: StatItem) => (
         />
 
         <h2
-            style={{ fontFamily: "Street Flow NYC" }}
+            style={{ fontFamily: "Street Flow NYC", fontSize: "40px", WebkitTextStroke: "3px black",paintOrder: "stroke" }}
             className="
             absolute left-1/2 top-[34%]
             -translate-x-1/2 -translate-y-1/2
             z-10 text-[#DDD059] text-2xl text-center
-            max-w-[100%] whitespace-nowrap
-            "
+            max-w-[100%] whitespace-nowrap"
         >
             {text}
         </h2>
@@ -37,9 +36,9 @@ export default function StatsCarousel() {
 
   const items: StatItem[] = useMemo(
     () => [
-      { src: "/Stats/hackCount.svg", alt: "Hackers Count", text: "250+ Hackers" },
-      { src: "/Stats/prizeM.svg", alt: "Prize Money", text: "$3000 in prizes" },
-      { src: "/Stats/dialoqueBubbleFlip.svg", alt: "Projects Count", text: "50+ Projects" },
+      { src: "/Stats/hackercount.svg", alt: "Hackers Count", text: "250+ Hackers" },
+      { src: "/Stats/prize.svg", alt: "Prize Money", text: <>$3000 <br/>in prizes</> },
+      { src: "/Stats/projFlipped.svg", alt: "Projects Count", text: "50+ Projects" },
     ],
     []
   );

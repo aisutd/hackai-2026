@@ -1,5 +1,4 @@
 import React from "react";
-import Image from "next/image";
 import { FaInstagram, FaDiscord, FaLinkedin } from "react-icons/fa";
 
 type FooterProps = {
@@ -20,13 +19,18 @@ const Footer = ({
   discordHref = "https://discord.gg/3VSEQv7ncR",
 }: FooterProps) => {
   return (
-    <footer className="w-full text-white backdrop-blur-lg bg-white/10 border-t border-white/20">
+    <footer className="w-full text-white border-t border-white/20"
+  style={{ 
+    backgroundColor: '#0a0a0f',
+    backdropFilter: 'blur(18px)',
+  }}
+    >
       <div className="mx-auto w-full max-w-6xl px-6 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Left: HackAI logo, Contact, Social */}
           <div className="pl-2 md:pl-6">
             <div className="relative h-16 w-36 mb-4 md:-ml-6 -ml-3">
-              <Image src={hackAiLogoSrc} alt="HackAI" fill className="object-contain" priority />
+              <img src={hackAiLogoSrc} alt="HackAI" className="object-contain h-16 w-36" />
             </div>
             <div className="font-bold text-lg mb-2 tracking-widest uppercase md:-ml-2 -ml-1" style={{ fontFamily: 'Octin Spraypaint', color: '#fff' }}>Contact Us</div>
             <div className="flex items-center gap-4 mb-2 md:-ml-2 -ml-1">
@@ -51,14 +55,7 @@ const Footer = ({
               aria-label="Artificial Intelligence Society (AIS) website"
               className="inline-block md:-ml-2 -ml-1"
             >
-              <Image
-                src={aisLogoSrc}
-                alt="AIS UTD"
-                width={240}
-                height={80}
-                className="object-contain"
-                priority
-              />
+              <img src={aisLogoSrc} alt="AIS UTD" className="object-contain w-60 h-20" />
             </a> 
           </div>
           
@@ -79,7 +76,7 @@ const Footer = ({
             <div className="font-bold text-lg mb-2 md:ml-8 ml-4">Follow our Newsletter</div>
               <form className="flex flex-col gap-2 md:ml-8 ml-4" style={{ fontFamily: 'Octin Spraypaint' }}>
                 <input type="email" placeholder="Email" className="rounded px-3 py-2 border border-white/30 bg-transparent text-white/90 tracking-widest uppercase focus:outline-none focus:border-[#A32A2A] transition-colors" style={{ fontFamily: 'Octin Spraypaint' }} />
-                <button type="submit" className="bg-[#A32A2A] text-white rounded px-3 py-2 font-semibold text-white/90 tracking-widest uppercase" style={{ fontFamily: 'Octin Spraypaint' }}>Subscribe</button>
+                <button type="submit" className="bg-[#A32A2A] rounded px-3 py-2 font-semibold text-white/90 tracking-widest uppercase" style={{ fontFamily: 'Octin Spraypaint' }}>Subscribe</button>
               </form>
           </div>
           
@@ -87,8 +84,9 @@ const Footer = ({
           
         </div>
       </div>
-      <div className="w-full bg-white/10 backdrop-blur-md border-t border-white/20 text-center py-3 text-white/90 text-sm">
-        <span className="tracking-widest uppercase" style={{ fontFamily: 'Octin Spraypaint' }}>All Copyrights are reserved by HackAI &lt;3</span>
+      <div className="w-full border-t border-white/20 text-center py-3 text-white/90 text-sm"
+        style={{ backgroundColor: '#111118' }}>
+              <span className="tracking-widest uppercase" style={{ fontFamily: 'Octin Spraypaint' }}>All Copyrights are reserved by HackAI &lt;3</span>
       </div>
     </footer>
   );

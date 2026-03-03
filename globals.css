@@ -1,3 +1,33 @@
+/* From Uiverse.io by barisdogansutcu */
+/* Optimized for performance */
+.apply-now-animated {
+  padding: 17px 40px;
+  border-radius: 50px;
+  cursor: pointer;
+  border: 0;
+  background-color: #ff741d;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1.5px 4px rgba(0, 0, 0, 0.12);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-size: 15px;
+  transition: background-color 0.3s, color 0.3s, letter-spacing 0.3s, box-shadow 0.3s, transform 0.1s;
+  will-change: background-color, color, letter-spacing, box-shadow, transform;
+}
+
+.apply-now-animated:hover {
+  letter-spacing: 3px;
+  background-color: #3dd581;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.apply-now-animated:active {
+  letter-spacing: 3px;
+  background-color: hsl(261deg 80% 48%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(93,24,220,0.15);
+  transform: translateY(4px);
+}
 @import "tailwindcss";
 /* Custom global styles can be added here */
 
@@ -21,6 +51,7 @@ html, body {
   margin: 0;
   padding: 0;
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 .glass-card {

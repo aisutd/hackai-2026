@@ -34,17 +34,21 @@ const About = () => {
   const shown = "opacity-100 translate-y-0";
 
   return (
-    <section ref={sectionRef} className="w-full py-24 px-6">
-      {/* Placeholder to avoid layout jump */}
+   <section ref={sectionRef} className="w-full py-24 px-6"
+              style={{
+                backgroundImage: "url('/About/bg.svg')",
+                backgroundSize: "contain",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat"
+              }}>
       {!shouldRender ? (
-        <div className="mx-auto max-w-6xl h-[520px] md:h-[420px]" />
+        <div className="mx-auto max-w-6xl h-130 md:h-105" />
       ) : (
         <div className="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-16">
-          {/* LEFT */}
           <div className={`${fadeBase} ${inView ? shown : hidden}`}>
             <h2
               className="text-white text-4xl md:text-5xl tracking-widest uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.9)]"
-              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black" }}
+              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
             >
               WHAT IS HACKAI?
             </h2>
@@ -67,14 +71,12 @@ const About = () => {
               BUILD ARTIFICIAL INTELLIGENCE PROJECTS IN 24 HOURS.
             </p>
           </div>
-
-          {/* RIGHT (slight stagger) */}
           <div
             className={`${fadeBase} ${inView ? shown : hidden} delay-150 md:pt-24`}
           >
             <h2
               className="text-white text-4xl md:text-5xl tracking-widest uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.9)]"
-              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black" }}
+              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
             >
               WHY SPONSOR HACKAI?
             </h2>

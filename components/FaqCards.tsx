@@ -112,7 +112,7 @@ export default function FAQSection() {
       <div className="flex justify-center">
         <h2
           className="text-white text-5xl md:text-6xl tracking-widest uppercase"
-          style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black" }}
+          style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke"}}
         >
           FAQS
         </h2>

@@ -1,144 +1,164 @@
-import React, { useState } from "react";
+import React from "react";
 import Head from "next/head";
+import dynamic from "next/dynamic";
 import Home from "./Home";
 import About from "./About";
 import Stats from "./Stats";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import Preloader from "@/components/Preloader";
-import TracksPage from "./Tracks";
 import ScheduleSection from "./schedule";
-import SponsorsSection from "./Sponsors";
-import FAQSection from "@/components/FaqCards";
-import Countdown from "./countdown";
-import Donors from "./Donors";
+
+const Countdown = dynamic(() => import("./countdown"), { ssr: false });
+const KeynoteSpeaker = dynamic(() => import("@/components/KeynoteSpeaker"), { ssr: false });
+const FAQSection = dynamic(() => import("@/components/FaqCards"), { ssr: false });
+const Donors = dynamic(() => import("./Donors"), { ssr: false });
 
 export default function HackAIPage() {
-  const [loading, setLoading] = useState(true);
-
   return (
     <div className="relative">
-      <Head> 
-        <title>HackAI</title> 
-        <link rel="icon" type="image/svg+xml" href="/Home/hackAiLogo.svg" /> 
-        <meta name="description" content="Welcome to HackAI: the biggest AI hackathon in North Texas!" /> 
+      <Head>
+        <title>HackAI</title>
+        <link rel="icon" type="image/png" href="/hackai-logo.png" />
+        <meta name="description" content="Welcome to HackAI: the biggest AI hackathon in North Texas!" />
       </Head>
 
-      {/* Background always visible so the lighting has something to reveal */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          backgroundColor: "black",
-          backgroundImage: "url(/mainbg.svg)",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      />
-      
-      {/* Desktop MLH (not fixed) */}
-        <div className="hidden md:block relative">
-          <a
-            id="mlh-trust-badge-desktop"
-            className="absolute right-6 -top-2 z-20 block w-[110px]"
-            href="https://mlh.io/na?utm_source=na-hackathon&utm_medium=TrustBadge&utm_campaign=2026-season&utm_content=black"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <img
-              src="https://s3.amazonaws.com/logged-assets/trust-badge/2026/mlh-trust-badge-2026-black.svg"
-              alt="Major League Hacking 2026 Hackathon Season"
-              className="w-full h-auto"
-            />
-          </a>
-        </div>
+ 
+      <Navbar />
 
+      <div className="hidden md:block fixed top-0 right-6 z-40">
+        <a
+          href="https://mlh.io/na?utm_source=na-hackathon&utm_medium=TrustBadge&utm_campaign=2026-season&utm_content=black"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img
+            src="https://s3.amazonaws.com/logged-assets/trust-badge/2026/mlh-trust-badge-2026-black.svg"
+            alt="Major League Hacking 2026 Hackathon Season"
+            className="w-[110px] h-auto"
+          />
+        </a>
+      </div>
+      <div className="md:hidden fixed top-16 right-4 z-40">
+        <a
+          href="https://mlh.io/na?utm_source=na-hackathon&utm_medium=TrustBadge&utm_campaign=2026-season&utm_content=black"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img
+            src="https://s3.amazonaws.com/logged-assets/trust-badge/2026/mlh-trust-badge-2026-black.svg"
+            alt="Major League Hacking 2026 Hackathon Season"
+            className="w-16 h-auto"
+          />
+        </a>
+      </div>
 
-      {loading && <Preloader onDone={() => setLoading(false)} />}
+      <main className="relative">
 
-
-      {/* Rest of the content */}
-      <div className="relative">
-        <Navbar />
-        
-
-        {/* Mobile MLH spacer (reserves vertical space below fixed navbar) */}
-        <div className="md:hidden h-[88px]" />
-
-        {/* Mobile MLH badge (not fixed) */}
-        <div className="md:hidden w-full flex justify-end pr-4 -mt-[88px] pt-4 pb-2">
-          <a
-            id="mlh-trust-badge-mobile"
-            className="block w-[64px] sm:w-[72px]"
-            href="https://mlh.io/na?utm_source=na-hackathon&utm_medium=TrustBadge&utm_campaign=2026-season&utm_content=black"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <img
-              src="https://s3.amazonaws.com/logged-assets/trust-badge/2026/mlh-trust-badge-2026-black.svg"
-              alt="Major League Hacking 2026 Hackathon Season"
-              className="w-full h-auto"
-            />
-          </a>
-        </div>
-
-
-
-        <main className="relative pt-24">
-          <section id="home" className="min-h-screen flex items-center justify-center -mt-20">
+        {/* mainbg wrapper: Home → Donors */}
+        <div
+          className="relative"
+          style={{
+            backgroundImage: "url('/mainbg.svg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center top",
+            backgroundColor: "black",
+          }}
+        >
+          <section id="home" className="min-h-screen flex items-center justify-center">
             <Home />
           </section>
-          
-          <section id="about" className="min-h-screen flex items-center justify-center m-4">
+
+          <section id="about" className="min-h-screen flex items-center justify-center">
             <About />
           </section>
 
-            <section
-              id="stats"
-              className="min-h-screen flex items-center justify-center m-6"
-            >
-              <Stats />
-            </section>
-          <section
-              id="countdown"
-              className="min-h-screen flex items-center justify-center m-2"
-          >
-            <Countdown
-              leftGraffitiSrc="/Countdown/bunny.svg"
-              rightGraffitiSrc="/Countdown/target.svg"
-              frameSrc="/Countdown/countdownBg.svg"
-            />
-
+          <section id="countdown" className="min-h-screen flex items-center justify-center">
+            <Countdown />
           </section>
-           
-          <section
-            id="stats"
-            className="min-h-screen flex items-center justify-center m-2"
-          >
+
+          <section id="stats" className="min-h-screen flex items-center justify-center">
             <Stats />
           </section>
 
-            <section
+          <section
+            id="donors"
+            className="relative min-h-screen flex items-center justify-center -mt-50"
+          >
+            <Donors />
+            <div
+              className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 z-10"
+              style={{ background: "linear-gradient(to bottom, transparent, black)" }}
+            />
+          </section>
+          
+          <section
               id="schedule"
               className="min-h-[120vh] flex items-center justify-center py-12 m-6 relative"
             >
               <div className="relative z-10 w-full flex items-center justify-center py-8">
                 <ScheduleSection />
               </div>
-            </section>
+           </section>
+          
+        </div>
 
-           <section id="faqs" className="min-h-screen flex items-center justify-center m-2">
-            <FAQSection />
-          </section>
-        </main>
 
         {/* Sponsors: its own full-width block, visually separate from main content and footer */}
-        <section id="sponsors">
+        {/* <section id="sponsors">
           <SponsorsSection />
+        </section> */}
+          
+        {/* Brick section */}
+        <section
+          className="relative w-full overflow-hidden -mt-10"
+          style={{
+            backgroundImage: "url('/KeynoteSpeaker/bg-brick.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          <div
+            className="pointer-events-none absolute top-0 left-0 right-0 z-[1] h-[300px]"
+            style={{
+              background: "linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0))",
+            }}
+          />
+          <div
+            className="absolute inset-0 z-0"
+            style={{
+              backgroundImage: "url('/KeynoteSpeaker/bg-graffiti.png')",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+          />
+          <div
+            className="absolute inset-0 z-0"
+            style={{
+              backgroundImage: "url('/KeynoteSpeaker/light.png')",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+          />
+          <div className="absolute inset-0 z-0 bg-black/5" />
+
+          <div className="relative z-10">
+            <section id="keynote" className="relative w-full min-h-screen">
+              <KeynoteSpeaker />
+            </section>
+            <section id="faqs" className="min-h-screen flex items-center justify-center mb-2">
+              <FAQSection />
+            </section>
+          </div>
         </section>
 
+      </main>
+
+      <div style={{ backgroundColor: '#0a0a0f' }}>
         <Footer />
       </div>
+
     </div>
   );
-} 
+}
