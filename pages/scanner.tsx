@@ -383,6 +383,8 @@ function ScannerPage() {
 
       const modeConfig = MODE_CONFIG[mode];
 
+      const isWaitlisted = currentStatus === "waitlist";
+
       if (currentStatus === "rejected") {
         setStatusWithHold({
           tone: "error",
@@ -391,7 +393,15 @@ function ScannerPage() {
         return;
       }
 
-      if (currentStatus !== "accepted") {
+      if (mode === "check-in" && !isWaitlisted && currentStatus !== "accepted") {
+        setStatusWithHold({
+          tone: "error",
+          text: `Rejected: only accepted or waitlisted hackers can be checked in (current status: ${String(hackerData.status || "unknown")}).`,
+        });
+        return;
+      }
+
+      if (mode !== "check-in" && currentStatus !== "accepted") {
         setStatusWithHold({
           tone: "error",
           text: `Rejected: only accepted hackers can be scanned for ${modeLabel} (current status: ${String(hackerData.status || "unknown")}).`,
@@ -448,6 +458,13 @@ function ScannerPage() {
         [modeConfig.field]: true,
         scans: arrayUnion(scanEntry),
       };
+
+      // If a waitlisted hacker is checking in, promote their status to accepted
+      if (mode === "check-in" && isWaitlisted) {
+        updates.status = "accepted";
+        updates.updatedAt = serverTimestamp();
+      }
+
       await updateDoc(hackerRef, updates);
       let statsUpdated = false;
       try {
@@ -482,7 +499,9 @@ function ScannerPage() {
         const fullName = `${firstName} ${lastName}`.trim() || trimmed;
         setStatusWithHold({
           tone: "success",
-          text: `Approved: ${fullName} is accepted and has been checked in.`,
+          text: isWaitlisted
+            ? `Approved: ${fullName} moved from waitlist to accepted and checked in.`
+            : `Approved: ${fullName} is accepted and has been checked in.`,
         });
       } else {
         setStatusWithHold({
