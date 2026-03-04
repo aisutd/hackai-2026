@@ -19,6 +19,7 @@ import {
   where,
 } from "firebase/firestore";
 import { isAdminEmail } from "@/utils/adminAccess";
+import jsQR from "jsqr";
 
 type ScanMode =
   | "check-in"
@@ -676,17 +677,23 @@ function ScannerPage() {
       const Ctor = (window as unknown as { BarcodeDetector?: QRDetectorConstructor })
         .BarcodeDetector;
 
-      if (!Ctor) {
-        setScannerError("This browser does not support camera QR detection.");
-        setStatus({
-          tone: "error",
-          text: "Scan failed: this browser does not support QR camera scanning.",
-        });
-        return;
+      if (Ctor) {
+        detectorRef.current = new Ctor({ formats: ["qr_code"] });
+      } else {
+        // Fallback: wrap jsQR in the same interface as BarcodeDetector
+        detectorRef.current = {
+          detect: async (canvas: HTMLCanvasElement): Promise<DetectedCode[]> => {
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return [];
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const result = jsQR(imageData.data, canvas.width, canvas.height);
+            if (result?.data) {
+              return [{ rawValue: result.data }];
+            }
+            return [];
+          },
+        };
       }
-
-      const detector = new Ctor({ formats: ["qr_code"] });
-      detectorRef.current = detector;
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
@@ -700,7 +707,7 @@ function ScannerPage() {
       setScannerActive(true);
       setStatus({
         tone: "info",
-        text: "Scanner started. Point camera at a QR code.",
+        text: `Scanner started${!Ctor ? " (jsQR fallback)" : ""}. Point camera at a QR code.`,
       });
       void tickDetect();
     } catch (err: unknown) {
