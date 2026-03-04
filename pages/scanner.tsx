@@ -11,6 +11,7 @@ import {
   getDocs,
   increment,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -241,20 +242,21 @@ function ScannerPage() {
   }, [statsDocId]);
 
   const resolveNextWaitlistNumber = useCallback(async (): Promise<number> => {
-    const snap = await getDocs(collection(db, HACKERS_COLLECTION));
+    const hackersRef = collection(db, HACKERS_COLLECTION);
+    const topWaitlistSnap = await getDocs(
+      query(hackersRef, orderBy("waitlistNumber", "desc"), limit(1))
+    );
+
     let maxWaitlistNumber = 0;
-    snap.docs.forEach((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
+    if (!topWaitlistSnap.empty) {
+      const data = topWaitlistSnap.docs[0].data() as Record<string, unknown>;
       const numberFromField =
         typeof data.waitlistNumber === "number" && Number.isFinite(data.waitlistNumber)
           ? data.waitlistNumber
           : 0;
-      const numberFromStatus = extractWaitlistNumber(data.status);
-      const currentMax = Math.max(numberFromField, numberFromStatus);
-      if (currentMax > maxWaitlistNumber) {
-        maxWaitlistNumber = currentMax;
-      }
-    });
+      maxWaitlistNumber = numberFromField;
+    }
+
     return maxWaitlistNumber + 1;
   }, []);
 
@@ -388,49 +390,19 @@ function ScannerPage() {
         return;
       }
 
-      if (mode === "check-in" && currentStatus !== "accepted") {
+      if (currentStatus !== "accepted") {
         setStatusWithHold({
           tone: "error",
-          text: `Rejected: only accepted hackers can be checked in (current status: ${String(hackerData.status || "unknown")}).`,
+          text: `Rejected: only accepted hackers can be scanned for ${modeLabel} (current status: ${String(hackerData.status || "unknown")}).`,
         });
         return;
       }
 
-      if (mode === "check-in") {
-        const hasLoggedIn = getBooleanByAliases(hackerData, ["hasLoggedin", "hasLoggedIn"]);
-        if (!hasLoggedIn) {
-          setStatusWithHold({
-            tone: "error",
-            text: "Rejected: hacker must be logged in before check in.",
-          });
-          return;
-        }
-      }
-
-      if (mode !== "check-in") {
-        if (currentStatus !== "accepted") {
-          setStatusWithHold({
-            tone: "error",
-            text: `Rejected: only accepted hackers can be scanned for ${modeLabel}.`,
-          });
-          return;
-        }
-
-        const hasLoggedIn = getBooleanByAliases(hackerData, ["hasLoggedin", "hasLoggedIn"]);
-        if (!hasLoggedIn) {
-          setStatusWithHold({
-            tone: "error",
-            text: `Rejected: hacker must be logged in before ${modeLabel}.`,
-          });
-          return;
-        }
-      }
-
-      const alreadyScannedForMode = getBooleanByAliases(hackerData, modeConfig.aliases);
-      if (alreadyScannedForMode) {
+      const hasLoggedIn = getBooleanByAliases(hackerData, ["hasLoggedin", "hasLoggedIn"]);
+      if (!hasLoggedIn) {
         setStatusWithHold({
           tone: "error",
-          text: "This hacker has already been scanned.",
+          text: `Rejected: hacker must be logged in before ${modeLabel}.`,
         });
         return;
       }
@@ -440,6 +412,15 @@ function ScannerPage() {
         setStatusWithHold({
           tone: "error",
           text: `Rejected: hacker must be checked in before ${modeLabel}.`,
+        });
+        return;
+      }
+
+      const alreadyScannedForMode = getBooleanByAliases(hackerData, modeConfig.aliases);
+      if (alreadyScannedForMode) {
+        setStatusWithHold({
+          tone: "error",
+          text: "This hacker has already been scanned.",
         });
         return;
       }
@@ -505,7 +486,7 @@ function ScannerPage() {
       } else {
         setStatusWithHold({
           tone: "success",
-          text: `Approved: ${modeLabel} scan recorded for ${trimmed}. Yes, it's working.`,
+          text: `Approved: ${modeLabel} scan recorded for ${trimmed}.`,
         });
       }
     } catch (err: unknown) {
@@ -656,7 +637,7 @@ function ScannerPage() {
         if (nowMs - lastSeenAt < QR_SCAN_COOLDOWN_MS) {
           setStatusWithHold({
             tone: "info",
-            text: "This hacker has already been scanned.",
+            text: "Cooldown: same QR was just scanned. Wait a moment before re-scanning.",
           });
           return;
         }
@@ -675,7 +656,7 @@ function ScannerPage() {
         } else {
           setStatusWithHold({
             tone: "info",
-            text: "This hacker has already been scanned.",
+            text: "Cooldown: same QR was just scanned. Wait a moment before re-scanning.",
           });
         }
       }

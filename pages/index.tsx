@@ -83,9 +83,9 @@ export default function HackAIPage() {
             
           </section>
 
-          {/* <section id="schedule" className="relative min-h-screen flex items-center justify-center mb-10">
+          <section id="schedule" className="relative min-h-screen flex items-center justify-center mb-10">
             <ScheduleSection />
-          </section> */}
+          </section>
 
           <div
               className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 z-10"
