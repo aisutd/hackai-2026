@@ -47,8 +47,8 @@ const About = () => {
         <div className="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-16">
           <div className={`${fadeBase} ${inView ? shown : hidden}`}>
             <h2
-              className="text-white text-4xl md:text-5xl tracking-widest uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.9)]"
-              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
+              className="text-white text-4xl sm:text-5xl md:text-6xl tracking-wide uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.85)]"
+              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "6px black", paintOrder: "stroke" }}
             >
               WHAT IS HACKAI?
             </h2>
@@ -75,8 +75,8 @@ const About = () => {
             className={`${fadeBase} ${inView ? shown : hidden} delay-150 md:pt-24`}
           >
             <h2
-              className="text-white text-4xl md:text-5xl tracking-widest uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.9)]"
-              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
+              className="text-white text-4xl sm:text-5xl md:text-6xl tracking-wide uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.85)]"
+              style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "6px black", paintOrder: "stroke" }}
             >
               WHY SPONSOR HACKAI?
             </h2>

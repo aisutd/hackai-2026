@@ -1,14 +1,21 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 
 export default function Home() {
+    const [showHome, setShowHome] = useState(false);
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => setShowHome(true));
+        return () => cancelAnimationFrame(frame);
+    }, []);
+
     // Callback to notify preloader when main image is loaded
     const handleMainImageLoad = useCallback(() => {
         
     }, []);
 
     return (
-        <div className="flex items-center w-full justify-center h-full">
+        <div className={`flex items-center w-full justify-center h-full transition-opacity duration-700 ease-out ${showHome ? "opacity-100" : "opacity-0"}`}>
             <div className="relative w-full max-w-400 h-[90vh] max-h-225">
                 
                
@@ -60,8 +67,8 @@ export default function Home() {
                 </div>
                 
                 
-                <div className="absolute left-1/2 bottom-[8%] -translate-x-1/2 z-30 flex gap-6">
-                    {/* <button
+                {/* <div className="absolute left-1/2 bottom-[8%] -translate-x-1/2 z-30 flex gap-6">
+                     <button
                     className="
                     inline-flex items-center justify-center
                     px-6 py-2.5 md:px-7 md:py-3
@@ -76,7 +83,7 @@ export default function Home() {
                     "
                     >
                         HACKERPACK
-                    </button> */}
+                    </button> 
 
                     <button
                         type="button"
@@ -86,7 +93,7 @@ export default function Home() {
                     >
                         APPLY NOW!
                     </button>
-                </div>  
+                </div>   */}
 
                  <div className="
                         absolute z-30
@@ -98,7 +105,7 @@ export default function Home() {
                         pointer-events-none
                     "
                     >
-                    <div className="relative w-full aspect-square rotate-20 origin-center">
+                    {/* <div className="relative w-full aspect-square rotate-20 origin-center">
                         <Image
                         src="/Home/heart.svg"
                         alt="Heart"
@@ -119,7 +126,7 @@ export default function Home() {
                             Apps close on <span className="text-pink-300">Feb 24th</span>
                         </p>
                         </div>
-                        </div>
+                    </div> */}
                 </div>       
             </div>
         </div>

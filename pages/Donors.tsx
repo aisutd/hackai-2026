@@ -45,8 +45,8 @@ const Donors = () => {
     <section id="donors" className="w-full text-center px-6 py-20 items-center justify-center">
       <div className="mx-auto max-w-6xl">
         <h2
-          className="text-white text-4xl md:text-5xl text-center tracking-widest uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.9)]"
-          style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "2px black", paintOrder: "stroke" }}
+          className="text-white text-4xl sm:text-5xl md:text-6xl text-center tracking-wide uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.85)]"
+          style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "6px black", paintOrder: "stroke" }}
         >
           DONORS
         </h2>
@@ -57,7 +57,7 @@ const Donors = () => {
           </p>
         )}
 
-        <div className="mt-10 flex flex-wrap justify-center gap-6">
+        <div className="mt-10 flex flex-col items-center gap-6 md:flex-row md:flex-wrap md:justify-center">
             {donors.map((d) => (
                 <a
                 key={d.id}
@@ -109,4 +109,3 @@ const Donors = () => {
 };
 
 export default Donors;
-

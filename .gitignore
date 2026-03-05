@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code local config
+.claude/launch.json
+
+# local scripts
+/scripts/
+/csv/

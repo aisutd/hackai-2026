@@ -31,8 +31,8 @@ function pad2(n: number) {
 
 export default function CountdownHero({
   target,
-  leftGraffitiSrc = "/Countdown/bunny.svg",
-  rightGraffitiSrc = "/Countdown/target.svg" ,
+  leftGraffitiSrc,
+  rightGraffitiSrc,
   frameSrc = "/Countdown/countdownBg.svg",
   heightClassName = "h-[740px] md:h-[460px]",
   title = "Countdown",

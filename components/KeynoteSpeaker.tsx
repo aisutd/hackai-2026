@@ -97,40 +97,38 @@ export default function KeynoteSpeaker() {
 
   return (
     <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
-      <div className="relative z-10 flex flex-col items-center text-center px-4 py-24 w-full">
+      <div className="relative z-10 flex flex-col items-center text-center px-4 py-20 md:py-24 w-full max-w-5xl mx-auto">
 
-        {/* Title row: crown + text + exclamation all inline */}
-        <div className="flex flex-row items-center justify-center gap-4 mb-10">
-          {/* Crown */}
-          <img
-            src="/KeynoteSpeaker/crown.png"
-            className="w-16 sm:w-20 md:w-24 object-contain"
-            alt="crown"
-          />
+        {/* Title row */}
+        <div className="mb-8 md:mb-10 w-full flex justify-center">
+          <div className="relative inline-flex items-center justify-center">
+            {/* Crown */}
+            <img
+              src="/KeynoteSpeaker/crown.png"
+              className="absolute -left-14 sm:-left-18 md:-left-22 top-1/2 -translate-y-1/2 w-12 sm:w-16 md:w-20 object-contain"
+              alt="crown"
+            />
 
-          {/* Title */}
-          <h2
-            style={{
-              color: "#000000",
-              fontFamily: "Street Flow NYC",
-              WebkitTextStrokeWidth: "5px",
-              WebkitTextStrokeColor: "white",
-              fontWeight: "400",
-              fontSize: "64px",
-              letterSpacing: "3.2px",
-              textAlign: "center",
-              paintOrder: "stroke",
-            }}
-          >
-            Keynote Speaker
-          </h2>
+            {/* Title */}
+            <h2
+              className="text-white text-4xl sm:text-5xl md:text-6xl tracking-wide uppercase drop-shadow-[0_4px_0_rgba(0,0,0,0.85)] leading-[0.95]"
+              style={{
+                fontFamily: "Street Flow NYC",
+                WebkitTextStroke: "6px black",
+                fontWeight: "400",
+                paintOrder: "stroke",
+              }}
+            >
+              Keynote <br className="sm:hidden" /> Speaker
+            </h2>
 
-          {/* Exclamation */}
-          <img
-            src="/KeynoteSpeaker/exclamation.png"
-            className="w-10 sm:w-12 md:w-16 object-contain"
-            alt="exclamation"
-          />
+            {/* Exclamation */}
+            <img
+              src="/KeynoteSpeaker/exclamation.png"
+              className="absolute -right-10 sm:-right-12 md:-right-16 top-1/2 -translate-y-1/2 w-8 sm:w-10 md:w-14 object-contain"
+              alt="exclamation"
+            />
+          </div>
         </div>
 
         {/* Speaker Image */}
@@ -153,17 +151,16 @@ export default function KeynoteSpeaker() {
 
         {/* Name */}
         <h3
+          className="max-w-[95vw] text-center text-[40px] sm:text-[48px] leading-none"
           style={{
             color: "white",
             textAlign: "center",
-            WebkitTextStrokeWidth: "6px",
+            WebkitTextStrokeWidth: "8px",
             WebkitTextStrokeColor: "#010D48",
             paintOrder: "stroke",
-            fontSize: "48px",
             fontFamily: "Octin Spraypaint",
             fontWeight: "400",
             letterSpacing: "2.4px",
-            lineHeight: "normal",
           }}
         >
           {speaker.name}
@@ -171,19 +168,16 @@ export default function KeynoteSpeaker() {
 
         {/* Description */}
         <p
+          className="max-w-[95vw] md:max-w-[900px] text-center text-[30px] sm:text-[36px] leading-none mt-2"
           style={{
             color: "white",
             textAlign: "center",
-            WebkitTextStrokeWidth: "6px",
+            WebkitTextStrokeWidth: "7px",
             WebkitTextStrokeColor: "#010D48",
             paintOrder: "stroke",
-            fontSize: "36px",
             fontFamily: "Octin Spraypaint",
             fontWeight: "400",
             letterSpacing: "1.8px",
-            lineHeight: "normal",
-            marginTop: "10px",
-            maxWidth: "900px",
           }}
         >
           {speaker.description}

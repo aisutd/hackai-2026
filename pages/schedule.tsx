@@ -303,7 +303,7 @@ export default function ScheduleSection() {
 
   return (
     <div
-      className="relative w-full min-h-[135vh] pt-16 pb-40 px-4 md:px-6"
+      className="relative w-full min-h-[180vh] pt-16 pb-40 px-4 md:px-6"
       style={{
         backgroundImage: "url('/schedule/bg.svg')",
         backgroundSize: "100% auto",

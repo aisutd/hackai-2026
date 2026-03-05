@@ -1,14 +1,21 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import StatsCarousel from "../components/StatsCarousel";
 
 
 
 const Stats = () => {
+  const [animateDesktopStats, setAnimateDesktopStats] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setAnimateDesktopStats(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <div className="w-full py-24 px-6 m-8">
       <h1
-        className="text-[#EBA274] text-4xl md:text-5xl ml-8 pb-12 drop-shadow-[0_4px_0_rgba(0,0,0,0.85)]"
+        className="text-[#EBA274] text-4xl sm:text-5xl md:text-6xl tracking-wide ml-8 pb-12 drop-shadow-[0_4px_0_rgba(0,0,0,0.85)]"
         style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "6px black",paintOrder: "stroke" }}
       >
         HACKAI 2025 had...
@@ -58,10 +65,15 @@ const Stats = () => {
             priority
           />
 
-          <div className="absolute left-[10%] top-[-12%] w-65 sm:w-[320px] md:w-95">
+          <div
+            className={`absolute left-[10%] top-[-12%] w-65 sm:w-[320px] md:w-95 transform-gpu transition-all duration-500 ease-out will-change-transform ${
+              animateDesktopStats ? "opacity-100 scale-100" : "opacity-0 scale-75"
+            }`}
+            style={{ transitionDelay: "120ms" }}
+          >
             <div className="relative w-full">
               <Image
-                src="/Stats/hackerCount.svg"
+                src="/Stats/hackercount.svg"
                 alt="Hackers Count"
                 width={400}
                 height={300}
@@ -77,7 +89,12 @@ const Stats = () => {
             </div>
           </div>
 
-          <div className="absolute right-[4%] top-[-20%] w-65 sm:w-[320px] md:w-95">
+          <div
+            className={`absolute right-[4%] top-[-20%] w-65 sm:w-[320px] md:w-95 transform-gpu transition-all duration-500 ease-out will-change-transform ${
+              animateDesktopStats ? "opacity-100 scale-100" : "opacity-0 scale-75"
+            }`}
+            style={{ transitionDelay: "380ms" }}
+          >
             <div className="relative w-full">
               <Image
                 src="/Stats/prize.svg"
@@ -96,7 +113,12 @@ const Stats = () => {
             </div>
           </div>
 
-          <div className="absolute left-[20%] bottom-[-15%] w-65 sm:w-[320px] md:w-95">
+          <div
+            className={`absolute left-[20%] bottom-[-15%] w-65 sm:w-[320px] md:w-95 transform-gpu transition-all duration-500 ease-out will-change-transform ${
+              animateDesktopStats ? "opacity-100 scale-100" : "opacity-0 scale-75"
+            }`}
+            style={{ transitionDelay: "640ms" }}
+          >
             <div className="relative w-full">
               <Image
                 src="/Stats/projects.svg"
