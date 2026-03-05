@@ -57,9 +57,6 @@ function getTagImagePath(tag: EventType): string {
   return config ? config.tagImagePath : EVENT_TYPES[3].tagImagePath;
 }
 
-/**
- * Parse time string (e.g. "7:30 AM", "12:00 AM", "10:00 AM CST") to minutes since midnight for sorting.
- */
 function parseTimeToMinutes(timeStr: string): number {
   const normalized = String(timeStr ?? "").trim().replace(/\s+(CST|CDT|EST|PST)$/i, "").trim();
   const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
@@ -75,7 +72,6 @@ function parseTimeToMinutes(timeStr: string): number {
   return hour * 60 + min;
 }
 
-/** Get first non-empty string from possible Firebase field names (tries exact + case variants). */
 function pickField(data: Record<string, unknown>, ...keys: string[]): string {
   for (const key of keys) {
     const value = data[key];
