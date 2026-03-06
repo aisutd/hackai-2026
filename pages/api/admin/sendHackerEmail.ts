@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import fs from "fs";
 import path from "path";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/firebase/admin";
 
 type SendResponse =
@@ -286,11 +285,7 @@ export default async function handler(
     });
 
     await hackerRef.update({
-      emailSentAt: FieldValue.serverTimestamp(),
-      emailSentTo: email,
-      emailSentSubject: "🛹 HackAI 2026: Your Application Status & Event Details",
       emailSendStatus: "sent",
-      emailSendError: FieldValue.delete(),
       emailSentBy: callerEmail,
     });
 

@@ -11,7 +11,7 @@ import {
   getDocs,
   increment,
   limit,
-  orderBy,
+
   query,
   serverTimestamp,
   setDoc,
@@ -243,23 +243,16 @@ function ScannerPage() {
   }, [statsDocId]);
 
   const resolveNextWaitlistNumber = useCallback(async (): Promise<number> => {
-    const hackersRef = collection(db, HACKERS_COLLECTION);
-    const topWaitlistSnap = await getDocs(
-      query(hackersRef, orderBy("waitlistNumber", "desc"), limit(1))
-    );
-
-    let maxWaitlistNumber = 0;
-    if (!topWaitlistSnap.empty) {
-      const data = topWaitlistSnap.docs[0].data() as Record<string, unknown>;
-      const numberFromField =
-        typeof data.waitlistNumber === "number" && Number.isFinite(data.waitlistNumber)
-          ? data.waitlistNumber
-          : 0;
-      maxWaitlistNumber = numberFromField;
+    const resolvedStatsDocId = await ensureStatsDocId();
+    const statsSnap = await getDoc(doc(db, SCANNER_STATS_COLLECTION, resolvedStatsDocId));
+    let currentCount = 0;
+    if (statsSnap.exists()) {
+      const data = statsSnap.data() as Record<string, unknown>;
+      const raw = data[MODE_STATS_FIELD.waitlist];
+      currentCount = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
     }
-
-    return maxWaitlistNumber + 1;
-  }, []);
+    return currentCount + 1;
+  }, [ensureStatsDocId]);
 
   const findHackerIdByQrValue = useCallback(async (rawValue: string): Promise<string | null> => {
     const trimmed = rawValue.trim();
@@ -790,7 +783,14 @@ function ScannerPage() {
             </label>
             <select
               value={mode}
-              onChange={(e) => setMode(e.target.value as ScanMode)}
+              onChange={(e) => {
+                const newMode = e.target.value as ScanMode;
+                setMode(newMode);
+                if (scannerActive) {
+                  stopScanner();
+                  setTimeout(() => void startScanner(), 300);
+                }
+              }}
               className="w-full rounded-xl px-4 py-3 bg-black/40 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#a259ff]"
             >
               {SCAN_MODES.map((item) => (

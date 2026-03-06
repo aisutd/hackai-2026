@@ -22,10 +22,20 @@ service cloud.firestore {
     function ownerCanUpdateSelfFieldsOnly() {
       return isOwnerByEmail()
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          "fname",
+          "lname",
           "hasLoggedIn",
           "phone_number",
           "updatedAt",
         ])
+        && (
+          !("fname" in request.resource.data.diff(resource.data).changedKeys())
+          || request.resource.data.fname is string
+        )
+        && (
+          !("lname" in request.resource.data.diff(resource.data).changedKeys())
+          || request.resource.data.lname is string
+        )
         && (
           !("hasLoggedIn" in request.resource.data)
           || request.resource.data.hasLoggedIn == true
@@ -76,14 +86,17 @@ service cloud.firestore {
     }
 
     match /hackers/{hackerId} {
-      // Public code-based lookup for signup only (single-doc reads, no listing).
-      allow get: if isAdmin() || isOwnerByEmail() || isPublicSignupCodeLookup(hackerId);
+      // Signed-in users can read any hacker doc (needed for unique-code generation).
+      allow get: if isAdmin() || isOwnerByEmail() || isPublicSignupCodeLookup(hackerId) || isSignedIn();
 
       // Admin can list all. Signed-in users can only match docs where doc email == auth email.
       allow list: if isAdmin() || isOwnerByEmail();
 
-      // Admin-only manual profile creation.
-      allow create: if isAdmin();
+      // Admin can create freely. Signed-in users can create their own doc (email must match auth).
+      allow create: if isAdmin()
+        || (isSignedIn()
+            && request.resource.data.email is string
+            && request.resource.data.email == request.auth.token.email);
 
       // Admin can update all fields; users can only set allowed self-service fields.
       allow update: if isAdmin() || ownerCanUpdateSelfFieldsOnly();

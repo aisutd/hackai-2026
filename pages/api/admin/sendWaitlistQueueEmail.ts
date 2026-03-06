@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/firebase/admin";
 
 type WaitlistRangeResponse =
@@ -188,12 +187,8 @@ export default async function handler(
         });
         sent += 1;
         await adminDb.collection("hackers").doc(row.docId).update({
-          waitlistAcceptedEmailSentAt: FieldValue.serverTimestamp(),
-          waitlistAcceptedEmailSentTo: email,
-          waitlistAcceptedEmailSentBy: callerEmail,
-          waitlistAcceptedEmailRange: `${startNumber}-${endNumber}`,
           waitlistAcceptedEmailStatus: "sent",
-          waitlistAcceptedEmailError: FieldValue.delete(),
+          waitlistAcceptedEmailSentBy: callerEmail,
         });
       } catch (err: unknown) {
         failed += 1;
@@ -201,7 +196,6 @@ export default async function handler(
         failures.push(`${row.docId}: ${reason}`);
         await adminDb.collection("hackers").doc(row.docId).update({
           waitlistAcceptedEmailStatus: "failed",
-          waitlistAcceptedEmailError: reason,
         });
       }
     }

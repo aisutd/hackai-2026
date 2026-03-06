@@ -49,6 +49,8 @@ const CompleteProfile = () => {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState("");
   const [targetDocId, setTargetDocId] = useState("");
+  const [firstNameInput, setFirstNameInput] = useState("");
+  const [lastNameInput, setLastNameInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,6 +139,13 @@ const CompleteProfile = () => {
       return;
     }
 
+    const firstName = firstNameInput.trim();
+    const lastName = lastNameInput.trim();
+    if (!firstName || !lastName) {
+      setError("Please enter your first and last name.");
+      return;
+    }
+
     const normalizedPhone = normalizePhoneForStorage(phoneInput);
     if (!normalizedPhone) {
       setError("Please enter a valid US phone number (10 digits).");
@@ -146,12 +155,14 @@ const CompleteProfile = () => {
     setSaving(true);
     try {
       await updateDoc(doc(db, HACKERS_COLLECTION, targetDocId), {
+        fname: firstName,
+        lname: lastName,
         phone_number: normalizedPhone,
         updatedAt: serverTimestamp(),
       });
       router.replace("/userProfile");
     } catch {
-      setError("Unable to save your phone number. Please try again.");
+      setError("Unable to save your profile. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -168,19 +179,45 @@ const CompleteProfile = () => {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-br from-[#1a0033] via-[#2d0a4b] to-[#0f051d] text-white">
       <div className="w-full max-w-2xl rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md p-6 md:p-8 shadow-2xl">
-        <h1 className="text-3xl font-bold mb-3">Emergency Contact Setup</h1>
-        <p className="text-gray-200 mb-2">
-          In case of emergencies during the event, we need a phone number where we can reach you quickly.
-        </p>
+        <h1 className="text-3xl font-bold mb-3">Complete Your Profile</h1>
         <p className="text-gray-300 mb-6">
-          This number will be attached to your profile and used only for event operations and urgent communication.
+          Please fill in your details below to finish setting up your account.
         </p>
 
         {userEmail && (
-          <div className="mb-4 text-sm text-gray-300 break-all">
-            Signed in as: <span className="text-white">{userEmail}</span>
+          <div className="mb-6">
+            <label className="block text-sm uppercase tracking-widest text-gray-200 mb-2">Email</label>
+            <input
+              type="email"
+              value={userEmail}
+              readOnly
+              className="w-full rounded-xl px-4 py-3 bg-black/20 border border-white/10 text-gray-300 cursor-not-allowed"
+            />
           </div>
         )}
+
+        <div className="flex gap-4 mb-4">
+          <div className="flex-1">
+            <label className="block text-sm uppercase tracking-widest text-gray-200 mb-2">First Name</label>
+            <input
+              type="text"
+              value={firstNameInput}
+              onChange={(e) => setFirstNameInput(e.target.value)}
+              placeholder="Jane"
+              className="w-full rounded-xl px-4 py-3 bg-black/35 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#a259ff]"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm uppercase tracking-widest text-gray-200 mb-2">Last Name</label>
+            <input
+              type="text"
+              value={lastNameInput}
+              onChange={(e) => setLastNameInput(e.target.value)}
+              placeholder="Doe"
+              className="w-full rounded-xl px-4 py-3 bg-black/35 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#a259ff]"
+            />
+          </div>
+        </div>
 
         <label className="block text-sm uppercase tracking-widest text-gray-200 mb-2">Phone Number</label>
         <input

@@ -18,7 +18,7 @@ const Navbar = () => {
     { label: "SPONSORS", id: "sponsors" },
     { label: "TRAILER", href: "https://www.youtube.com/watch?v=7_SRKyABAmo", external: true },
     // { label: "LIVESTREAM", href: "https://www.youtube.com/live", external: true },
-    // { label: "MENU", href: "/menu" },
+    { label: "MENU", href: "/menu" },
   ];
 
   useEffect(() => {

@@ -4,30 +4,36 @@ import Navbar from "@/components/Navbar";
 import { auth } from "@/firebase/clientApp";
 import { isAdminEmail } from "@/utils/adminAccess";
 
-type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snacks" | "Drinks";
+type MealSlot = "sat-lunch" | "sat-dinner" | "sun-breakfast" | "sun-lunch";
 
 type FoodItem = {
   id: string;
   name: string;
-  meal: MealType;
+  slot: MealSlot;
   notes: string;
 };
 
-const STORAGE_KEY = "hackai_food_menu_items_v1";
+const STORAGE_KEY = "hackai_food_menu_items_v2";
 
 const DEFAULT_ITEMS: FoodItem[] = [
-  { id: "d1", name: "Pizza", meal: "Dinner", notes: "Vegetarian option included" },
-  { id: "l1", name: "Sandwiches", meal: "Lunch", notes: "Chicken + veggie" },
-  { id: "b1", name: "Bagels", meal: "Breakfast", notes: "Cream cheese + fruit" },
+  { id: "sl1", name: "Sandwiches", slot: "sat-lunch", notes: "Chicken + veggie" },
+  { id: "sd1", name: "Pizza", slot: "sat-dinner", notes: "Vegetarian option included" },
+  { id: "sb1", name: "Bagels", slot: "sun-breakfast", notes: "Cream cheese + fruit" },
+  { id: "ul1", name: "Wraps", slot: "sun-lunch", notes: "Assorted fillings" },
 ];
 
-const MEAL_ORDER: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snacks", "Drinks"];
+const MEAL_SLOTS: { id: MealSlot; label: string }[] = [
+  { id: "sat-lunch", label: "Saturday Lunch" },
+  { id: "sat-dinner", label: "Dinner" },
+  { id: "sun-breakfast", label: "Breakfast" },
+  { id: "sun-lunch", label: "Sunday Lunch" },
+];
 
 export default function MenuPage() {
   const [items, setItems] = useState<FoodItem[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [foodName, setFoodName] = useState("");
-  const [meal, setMeal] = useState<MealType>("Lunch");
+  const [slot, setSlot] = useState<MealSlot>("sat-lunch");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
@@ -63,10 +69,10 @@ export default function MenuPage() {
   }, [items]);
 
   const groupedItems = useMemo(() => {
-    const grouped = new Map<MealType, FoodItem[]>();
-    for (const mealType of MEAL_ORDER) grouped.set(mealType, []);
+    const grouped = new Map<MealSlot, FoodItem[]>();
+    for (const s of MEAL_SLOTS) grouped.set(s.id, []);
     for (const item of items) {
-      grouped.get(item.meal)?.push(item);
+      grouped.get(item.slot)?.push(item);
     }
     return grouped;
   }, [items]);
@@ -80,12 +86,12 @@ export default function MenuPage() {
     const newItem: FoodItem = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       name: trimmed,
-      meal,
+      slot,
       notes: notes.trim(),
     };
     setItems((prev) => [newItem, ...prev]);
     setFoodName("");
-    setMeal("Lunch");
+    setSlot("sat-lunch");
     setNotes("");
     setError("");
   };
@@ -100,8 +106,9 @@ export default function MenuPage() {
         <title>HackAI Food Menu</title>
       </Head>
       <Navbar />
+      {/* Base background */}
       <div
-        className="fixed inset-0 -z-10"
+        className="fixed inset-0 -z-20"
         style={{
           backgroundColor: "black",
           backgroundImage: "url(/mainbg.svg)",
@@ -110,17 +117,26 @@ export default function MenuPage() {
           backgroundRepeat: "no-repeat",
         }}
       />
+      {/* Menu graffiti overlay */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          backgroundImage: "url(/Menu/bg.svg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
 
-      <main className="mx-auto w-[min(980px,calc(100%-2rem))] pt-36 pb-16">
+      <main className="mx-auto w-[min(700px,calc(100%-2rem))] pt-36 pb-16">
         <section
-          className="rounded-3xl p-6 md:p-8"
+          className="rounded-3xl px-8 md:px-14 py-10 flex flex-col items-center"
           style={{
-            background: "linear-gradient(120deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%)",
-            boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.18)",
+            background: "rgba(200, 60, 120, 0.25)",
             backdropFilter: "blur(18px) saturate(180%)",
             WebkitBackdropFilter: "blur(18px) saturate(180%)",
-            border: "0.5px solid rgba(255,255,255,0.35)",
-            outline: "1.5px solid rgba(255,255,255,0.18)",
+            border: "1px solid rgba(255, 150, 190, 0.3)",
+            boxShadow: "0 8px 32px rgba(200, 60, 120, 0.15)",
           }}
         >
           <h1
@@ -130,12 +146,20 @@ export default function MenuPage() {
             FOOD MENU
           </h1>
 
-          <p className="mt-3 text-center text-white/85 text-sm md:text-base">
-            {isAdmin ? "Add and update food items here." : "Current hackathon food lineup."}
-          </p>
+          {isAdmin && (
+            <p className="mt-3 text-center text-white/85 text-sm md:text-base">
+              Add and update food items here.
+            </p>
+          )}
 
           {isAdmin && (
-            <div className="mt-6 rounded-2xl border border-white/20 bg-black/35 p-4 md:p-5">
+            <div
+              className="mt-6 rounded-2xl p-4 md:p-5"
+              style={{
+                background: "rgba(0,0,0,0.45)",
+                border: "3px solid rgba(255,255,255,0.7)",
+              }}
+            >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <input
                   type="text"
@@ -145,13 +169,13 @@ export default function MenuPage() {
                   className="rounded-xl border border-white/25 bg-black/40 px-4 py-3 text-white outline-none"
                 />
                 <select
-                  value={meal}
-                  onChange={(e) => setMeal(e.target.value as MealType)}
+                  value={slot}
+                  onChange={(e) => setSlot(e.target.value as MealSlot)}
                   className="rounded-xl border border-white/25 bg-black/40 px-4 py-3 text-white outline-none"
                 >
-                  {MEAL_ORDER.map((mealType) => (
-                    <option key={mealType} value={mealType} className="text-black">
-                      {mealType}
+                  {MEAL_SLOTS.map((s) => (
+                    <option key={s.id} value={s.id} className="text-black">
+                      {s.label}
                     </option>
                   ))}
                 </select>
@@ -175,20 +199,20 @@ export default function MenuPage() {
             </div>
           )}
 
-          <div className="mt-7 space-y-4">
-            {MEAL_ORDER.map((mealType) => {
-              const mealItems = groupedItems.get(mealType) || [];
-              if (mealItems.length === 0) return null;
+          <div className="mt-7 space-y-6 w-full max-w-[600px] mx-auto text-center">
+            {MEAL_SLOTS.map((s) => {
+              const slotItems = groupedItems.get(s.id) || [];
+              if (slotItems.length === 0) return null;
               return (
-                <div key={mealType} className="rounded-2xl border border-white/20 bg-black/35 p-4 md:p-5">
-                  <h2 className="text-[#DDD059] text-xl tracking-widest" style={{ fontFamily: "Street Flow NYC" }}>
-                    {mealType}
+                <div key={s.id}>
+                  <h2 className="text-white text-xl md:text-2xl tracking-widest drop-shadow-[0_2px_0_rgba(0,0,0,0.8)]" style={{ fontFamily: "Street Flow NYC", WebkitTextStroke: "1px black", paintOrder: "stroke" }}>
+                    {s.label}
                   </h2>
-                  <div className="mt-3 space-y-2">
-                    {mealItems.map((item) => (
+                  <div className="mt-2 space-y-1">
+                    {slotItems.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 flex items-start justify-between gap-3"
+                        className="px-4 py-3 flex items-start justify-between gap-3"
                       >
                         <div>
                           <div className="text-white font-semibold">{item.name}</div>
@@ -211,7 +235,7 @@ export default function MenuPage() {
             })}
 
             {items.length === 0 && (
-              <div className="rounded-2xl border border-white/20 bg-black/30 p-5 text-white/75">
+              <div className="p-5 text-white/75">
                 No food items yet.
               </div>
             )}

@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/router";
 import { db, auth } from "@/firebase/clientApp";
-import { collection, doc, getDoc, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
   getAdditionalUserInfo,
   GoogleAuthProvider,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -38,7 +39,6 @@ const getPhoneFromData = (data: Record<string, unknown>): string => {
 
 const SignIn = () => {
   const router = useRouter();
-  const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"register" | "login">("login");
@@ -103,6 +103,14 @@ const SignIn = () => {
       const syncRoute = async () => {
         if (isAuthGuardPausedRef.current) return;
         if (!user) return;
+
+        // If email/password user hasn't verified email, send them to verify page
+        const isPasswordProvider = user.providerData.some((p) => p.providerId === "password");
+        if (isPasswordProvider && !user.emailVerified) {
+          router.replace("/verify-email");
+          return;
+        }
+
         const destination = await enforceAllowedLogin(user.email || "");
         if (!active) return;
         if (destination === "admin") {
@@ -115,7 +123,7 @@ const SignIn = () => {
           return;
         }
         await signOut(auth);
-        setError("No account found. Please sign up first using your 6-digit code.");
+        setError("No account found. Please sign up first.");
       };
 
       void syncRoute();
@@ -126,99 +134,45 @@ const SignIn = () => {
     };
   }, [enforceAllowedLogin, resolveUserDestination, router]);
 
-  // Focus next/prev input on change and handle backspace
-  const handleChange = (idx: number, value: string) => {
-    if (!/^[0-9]?$/.test(value)) return;
-    const newCode = [...code];
-    newCode[idx] = value;
-    setCode(newCode);
-    if (value && idx < 5) {
-      const next = document.getElementById(`code-input-${idx + 1}`);
-      if (next) (next as HTMLInputElement).focus();
+  const generateUniqueAccessCode = async (): Promise<string> => {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const accessCode = String(Math.floor(100000 + Math.random() * 900000));
+      const existing = await getDoc(doc(db, HACKERS_COLLECTION, accessCode));
+      if (!existing.exists()) return accessCode;
     }
+    throw new Error("Unable to generate a unique access code. Try again.");
   };
 
-  // Handle backspace to move focus to previous input
-  const handleKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !code[idx] && idx > 0) {
-      const prev = document.getElementById(`code-input-${idx - 1}`);
-      if (prev) {
-        (prev as HTMLInputElement).focus();
-        const newCode = [...code];
-        newCode[idx - 1] = "";
-        setCode(newCode);
-        e.preventDefault();
-      }
-    }
-  };
-
-  // Validate code and fetch linked applicant email
-  const validateCode = async (): Promise<{ ok: true; codeStr: string; applicantEmail: string } | { ok: false }> => {
-    const codeStr = code.join("");
-    if (codeStr.length !== 6) {
-      setError("Please enter the 6-digit code.");
-      return { ok: false };
-    }
-    setError("");
-    setLoading(true);
-    try {
-      const docRef = doc(db, HACKERS_COLLECTION, codeStr);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        setError("Invalid code. Please check and try again.");
-        setLoading(false);
-        return { ok: false };
-      }
-      const data = docSnap.data();
-      if (getHasLoggedIn(data)) {
-        setError("This code has already been used to register.");
-        setLoading(false);
-        return { ok: false };
-      }
-      const applicantEmail = String(data.email || "").trim().toLowerCase();
-      if (!applicantEmail) {
-        setError("No email is linked to this code.");
-        setLoading(false);
-        return { ok: false };
-      }
-      setLoading(false);
-      return { ok: true, codeStr, applicantEmail };
-    } catch {
-      setError("Error verifying code. Please try again.");
-      setLoading(false);
-      return { ok: false };
-    }
+  const createHackerDoc = async (email: string): Promise<void> => {
+    const accessCode = await generateUniqueAccessCode();
+    await setDoc(doc(db, HACKERS_COLLECTION, accessCode), {
+      access_code: accessCode,
+      email,
+      fname: "",
+      lname: "",
+      status: "rejected",
+      foodGroup: "A",
+      hasLoggedIn: true,
+      isCheckedIn: false,
+      breakfast: false,
+      dinner: false,
+      lunchd1: false,
+      lunchd2: false,
+      scanCount: 0,
+      scans: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   // Handle register/login submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === "register") {
-      const codeStr = code.join("");
-      const enteredEmail = email.trim().toLowerCase();
-      let normalizedEmail = "";
-
-      if (codeStr.length !== 6) {
-        setError("Please enter the 6-digit code to sign up.");
-        return;
-      }
-
-      const codeResult = await validateCode();
-      if (!codeResult.ok) return;
-      normalizedEmail = codeResult.applicantEmail;
-
-      if (!isValidEmail(enteredEmail)) {
-        setError("Please enter a valid email address.");
-        return;
-      }
-
-      if (enteredEmail !== normalizedEmail) {
-        setError(`This code is linked to ${normalizedEmail}. Please use that email.`);
-        return;
-      }
+      const normalizedEmail = email.trim().toLowerCase();
 
       if (!isValidEmail(normalizedEmail)) {
-        setError("Invalid email. Please use the one you used on the application.");
+        setError("Please enter a valid email address.");
         return;
       }
       if (password.length < 6) {
@@ -230,20 +184,36 @@ const SignIn = () => {
       setLoading(true);
       try {
         isAuthGuardPausedRef.current = true;
-        await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-        await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
+        const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+        await sendEmailVerification(cred.user);
+        const existingMatches = await getHackersByEmail(normalizedEmail);
+        if (existingMatches.length === 0) {
+          await createHackerDoc(normalizedEmail);
+        } else {
+          const primary = existingMatches.find((item) => getHasLoggedIn(item.data)) ?? existingMatches[0];
+          if (!getHasLoggedIn(primary.data)) {
+            await updateDoc(doc(db, HACKERS_COLLECTION, primary.id), { hasLoggedIn: true });
+          }
+        }
         isAuthGuardPausedRef.current = false;
-        const nextRoute = await resolveUserDestination(normalizedEmail);
-        router.replace(nextRoute);
+        router.replace("/verify-email");
       } catch (err: unknown) {
-        const code =
+        const errCode =
           typeof err === "object" && err !== null && "code" in err
             ? String((err as { code: unknown }).code)
             : "";
-        if (code === "auth/email-already-in-use") {
+        if (errCode === "auth/email-already-in-use") {
           try {
             await signInWithEmailAndPassword(auth, normalizedEmail, password);
-            await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
+            const existingMatches = await getHackersByEmail(normalizedEmail);
+            if (existingMatches.length === 0) {
+              await createHackerDoc(normalizedEmail);
+            } else {
+              const primary = existingMatches.find((item) => getHasLoggedIn(item.data)) ?? existingMatches[0];
+              if (!getHasLoggedIn(primary.data)) {
+                await updateDoc(doc(db, HACKERS_COLLECTION, primary.id), { hasLoggedIn: true });
+              }
+            }
             isAuthGuardPausedRef.current = false;
             const nextRoute = await resolveUserDestination(normalizedEmail);
             router.replace(nextRoute);
@@ -291,7 +261,7 @@ const SignIn = () => {
           router.replace(nextRoute);
         } else {
           await signOut(auth);
-          setError("No account found. Please sign up first using your 6-digit code.");
+          setError("No account found. Please sign up first.");
         }
       } catch (err: unknown) {
         let message = "Error signing in. Try again.";
@@ -300,7 +270,7 @@ const SignIn = () => {
             ? String((err as { code: unknown }).code)
             : "";
         if (code === "auth/user-not-found") {
-          message = "No account found. Please sign up first using your 6-digit code.";
+          message = "No account found. Please sign up first.";
         } else if (code === "auth/invalid-credential") {
           message = "Invalid password or credentials.";
         }
@@ -333,7 +303,7 @@ const SignIn = () => {
           await signOut(auth);
         }
         isAuthGuardPausedRef.current = false;
-        setError("No account found. Please sign up first using your 6-digit code.");
+        setError("No account found. Please sign up first.");
         setLoading(false);
         return;
       }
@@ -345,7 +315,7 @@ const SignIn = () => {
           await signOut(auth);
         }
         isAuthGuardPausedRef.current = false;
-        setError("No account found. Please sign up first using your 6-digit code.");
+        setError("No account found. Please sign up first.");
         setLoading(false);
         return;
       }
@@ -373,25 +343,6 @@ const SignIn = () => {
 
   const handleGoogleRegister = async () => {
     setError("");
-
-    const valid = await validateCode();
-    if (!valid.ok) return;
-
-    const codeStr = valid.codeStr;
-    let expectedEmail = "";
-    try {
-      const codeSnap = await getDoc(doc(db, HACKERS_COLLECTION, codeStr));
-      expectedEmail = String(codeSnap.data()?.email || "").trim().toLowerCase();
-    } catch {
-      setError("Unable to verify code email. Please try again.");
-      return;
-    }
-
-    if (!isValidEmail(expectedEmail)) {
-      setError("This code is not linked to a valid email account.");
-      return;
-    }
-
     setLoading(true);
     try {
       isAuthGuardPausedRef.current = true;
@@ -414,31 +365,28 @@ const SignIn = () => {
         return;
       }
 
-      if (googleEmail !== expectedEmail) {
-        if (isNewUser) {
-          await deleteUser(result.user);
-        } else {
-          await signOut(auth);
+      const matches = await getHackersByEmail(googleEmail);
+      if (matches.length === 0) {
+        await createHackerDoc(googleEmail);
+      } else {
+        const primary = matches.find((item) => getHasLoggedIn(item.data)) ?? matches[0];
+        if (!getHasLoggedIn(primary.data)) {
+          await updateDoc(doc(db, HACKERS_COLLECTION, primary.id), { hasLoggedIn: true });
         }
-        isAuthGuardPausedRef.current = false;
-        setError(`This code is linked to ${expectedEmail}. Please use that email account.`);
-        setLoading(false);
-        return;
       }
 
-      await updateDoc(doc(db, HACKERS_COLLECTION, codeStr), { hasLoggedIn: true });
       isAuthGuardPausedRef.current = false;
-      const nextRoute = await resolveUserDestination(expectedEmail);
+      const nextRoute = await resolveUserDestination(googleEmail);
       router.replace(nextRoute);
     } catch (err: unknown) {
       isAuthGuardPausedRef.current = false;
-      const code =
+      const errCode =
         typeof err === "object" && err !== null && "code" in err
           ? String((err as { code: unknown }).code)
           : "";
-      if (code === "auth/popup-closed-by-user") {
+      if (errCode === "auth/popup-closed-by-user") {
         setError("Google sign-up was cancelled.");
-      } else if (code === "auth/account-exists-with-different-credential") {
+      } else if (errCode === "auth/account-exists-with-different-credential") {
         setError("This email already exists with password sign-in. Please use email and password.");
       } else {
         const message = err instanceof Error ? err.message : "Error signing up with Google. Try again.";
@@ -496,30 +444,6 @@ const SignIn = () => {
               </>
             )}
           </div>
-          {/* 6-digit code input */}
-          {mode === "register" && (
-            <div className="w-full mb-4">
-              <label className="block mb-2 text-left text-gray-300 font-semibold">
-                Enter 6-digit login code (required)
-              </label>
-              <div className="flex gap-1 w-full" style={{flexWrap: 'nowrap', overflowX: 'auto', justifyContent: 'flex-start'}}>
-                {code.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    id={`code-input-${idx}`}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    className={`w-10 h-12 text-lg text-center border-2 rounded-lg focus:outline-none transition-all bg-black/60 ${digit ? "border-green-500" : "border-gray-400"} sm:w-12 sm:h-14 w-8 h-10 text-base min-w-[2.2rem]`}
-                    value={digit}
-                    onChange={e => handleChange(idx, e.target.value)}
-                    onKeyDown={e => handleKeyDown(idx, e)}
-                    onFocus={e => e.target.select()}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
           {mode === "register" && (
             <>
               <button
