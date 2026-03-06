@@ -113,6 +113,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /scannerRecords/{recordId} {
+      allow get, list, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
     // Deny anything not explicitly allowed above.
     match /{document=**} {
       allow read, write: if false;

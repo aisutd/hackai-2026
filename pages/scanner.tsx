@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { FaQrcode, FaHistory, FaCamera, FaStop } from "react-icons/fa";
 import { auth, db } from "@/firebase/clientApp";
 import {
+  addDoc,
   arrayUnion,
   collection,
   doc,
@@ -11,7 +12,8 @@ import {
   getDocs,
   increment,
   limit,
-
+  onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -58,9 +60,9 @@ type QRDetector = {
 };
 type QRDetectorConstructor = new (opts?: { formats?: string[] }) => QRDetector;
 
-const SCAN_STORAGE_KEY = "hackai_scanner_records";
 const HACKERS_COLLECTION = "hackers";
 const SCANNER_STATS_COLLECTION = "scannerStats";
+const SCANNER_RECORDS_COLLECTION = "scannerRecords";
 const SCANNER_STATS_DOC_ID = "global";
 const QR_SCAN_COOLDOWN_MS = 10000;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -134,17 +136,7 @@ function ScannerPage() {
   const [pendingWaitlistEmail, setPendingWaitlistEmail] = useState("");
   const [pendingWaitlistError, setPendingWaitlistError] = useState("");
   const [pendingWaitlistSaving, setPendingWaitlistSaving] = useState(false);
-  const [records, setRecords] = useState<ScanRecord[]>(() => {
-    if (typeof window === "undefined") return [];
-    const raw = localStorage.getItem(SCAN_STORAGE_KEY);
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw) as ScanRecord[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  const [records, setRecords] = useState<ScanRecord[]>([]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -215,8 +207,35 @@ function ScannerPage() {
   }, [isAdmin]);
 
   useEffect(() => {
-    localStorage.setItem(SCAN_STORAGE_KEY, JSON.stringify(records));
-  }, [records]);
+    if (isAdmin !== true) return;
+
+    const recordsQuery = query(
+      collection(db, SCANNER_RECORDS_COLLECTION),
+      orderBy("createdAtEpoch", "desc"),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(
+      recordsQuery,
+      (snapshot) => {
+        const fetched: ScanRecord[] = snapshot.docs.map((d) => {
+          const data = d.data() as Record<string, unknown>;
+          return {
+            id: d.id,
+            mode: (data.mode as ScanMode) || "check-in",
+            value: String(data.value || ""),
+            createdAt: String(data.createdAt || ""),
+          };
+        });
+        setRecords(fetched);
+      },
+      (err) => {
+        console.error("Scanner records listener failed:", err);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isAdmin]);
 
   const selectedMode = useMemo(
     () => SCAN_MODES.find((m) => m.value === mode) ?? SCAN_MODES[0],
@@ -301,6 +320,19 @@ function ScannerPage() {
   const setStatusWithHold = useCallback((next: ScanStatus, holdMs = 3000) => {
     setStatus(next);
     statusHoldUntilRef.current = Date.now() + holdMs;
+  }, []);
+
+  const saveScanRecord = useCallback(async (record: ScanRecord) => {
+    try {
+      await addDoc(collection(db, SCANNER_RECORDS_COLLECTION), {
+        mode: record.mode,
+        value: record.value,
+        createdAt: record.createdAt,
+        createdAtEpoch: Date.now(),
+      });
+    } catch (err) {
+      console.error("Failed to save scan record:", err);
+    }
   }, []);
 
   const handleScanAttempt = useCallback(async (value: string) => {
@@ -475,7 +507,7 @@ function ScannerPage() {
         console.error("Scanner stats update failed (non-blocking):", statsErr);
       }
 
-      setRecords((prev) => [record, ...prev].slice(0, 100));
+      void saveScanRecord(record);
       if (statsUpdated) {
         setStatsCounts((prev) => ({
           ...prev,
@@ -509,7 +541,7 @@ function ScannerPage() {
         text: `Rejected: ${message}`,
       });
     }
-  }, [ensureStatsDocId, findHackerIdByQrValue, getBooleanByAliases, mode, resolveNextWaitlistNumber, setStatusWithHold]);
+  }, [ensureStatsDocId, findHackerIdByQrValue, getBooleanByAliases, mode, resolveNextWaitlistNumber, saveScanRecord, setStatusWithHold]);
 
   const confirmWaitlistAssignment = useCallback(async () => {
     if (!pendingWaitlistAssignment || pendingWaitlistSaving) return;
@@ -567,7 +599,7 @@ function ScannerPage() {
         console.error("Scanner stats update failed (non-blocking):", statsErr);
       }
 
-      setRecords((prev) => [record, ...prev].slice(0, 100));
+      void saveScanRecord(record);
       if (statsUpdated) {
         setStatsCounts((prev) => ({
           ...prev,
@@ -588,7 +620,7 @@ function ScannerPage() {
     } finally {
       setPendingWaitlistSaving(false);
     }
-  }, [ensureStatsDocId, pendingWaitlistAssignment, pendingWaitlistEmail, pendingWaitlistSaving, setStatusWithHold]);
+  }, [ensureStatsDocId, pendingWaitlistAssignment, pendingWaitlistEmail, pendingWaitlistSaving, saveScanRecord, setStatusWithHold]);
 
   const stopScanner = useCallback(() => {
     if (loopTimerRef.current) {
@@ -801,20 +833,6 @@ function ScannerPage() {
             </select>
           </div>
 
-          {visibleStatModes.length > 0 && (
-            <div className="w-full flex flex-wrap gap-3 mb-5">
-              {visibleStatModes.map((item) => (
-                <div
-                  key={item.value}
-                  className="flex-1 min-w-[140px] rounded-xl border border-white/20 bg-black/35 px-4 py-3"
-                >
-                  <div className="text-[11px] uppercase tracking-widest text-gray-200">{item.label}</div>
-                  <div className="text-2xl font-bold text-[#DDD059]">{statsCounts[item.value]}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="w-full mb-4 rounded-xl border border-white/20 bg-black/35 p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="text-sm uppercase tracking-widest text-gray-200">QR Camera Scanner</div>
@@ -866,6 +884,20 @@ function ScannerPage() {
               </p>
             )}
           </div>
+
+          {visibleStatModes.length > 0 && (
+            <div className="w-full flex flex-wrap gap-3 mb-5">
+              {visibleStatModes.map((item) => (
+                <div
+                  key={item.value}
+                  className="flex-1 min-w-[140px] rounded-xl border border-white/20 bg-black/35 px-4 py-3"
+                >
+                  <div className="text-[11px] uppercase tracking-widest text-gray-200">{item.label}</div>
+                  <div className="text-2xl font-bold text-[#DDD059]">{statsCounts[item.value]}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {pendingWaitlistAssignment && (
             <div className="w-full mb-4 rounded-xl border border-yellow-300/35 bg-yellow-900/20 px-4 py-4">
