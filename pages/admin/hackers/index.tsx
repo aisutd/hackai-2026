@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { FaChevronDown, FaChevronRight, FaSearch, FaUsers, FaAngleLeft, FaAngleRight } from "react-icons/fa";
-import { Timestamp, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
+import { Timestamp, collection, deleteField, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import Navbar from "@/components/Navbar";
 import { auth, db } from "@/firebase/clientApp";
 import { isAdminEmail } from "@/utils/adminAccess";
@@ -200,6 +200,9 @@ function AdminHackersPage() {
   const [sendingWaitlistRange, setSendingWaitlistRange] = useState(false);
   const [waitlistRangeError, setWaitlistRangeError] = useState("");
   const [waitlistRangeSuccess, setWaitlistRangeSuccess] = useState("");
+  const [clearingWaitlist, setClearingWaitlist] = useState(false);
+  const [clearWaitlistError, setClearWaitlistError] = useState("");
+  const [clearWaitlistSuccess, setClearWaitlistSuccess] = useState("");
   const [assigningFoodGroups, setAssigningFoodGroups] = useState(false);
   const [foodGroupResult, setFoodGroupResult] = useState("");
   const [foodGroupError, setFoodGroupError] = useState("");
@@ -541,6 +544,57 @@ function AdminHackersPage() {
       setWaitlistRangeError(message);
     } finally {
       setSendingWaitlistRange(false);
+    }
+  };
+
+  const handleClearWaitlistQueue = async () => {
+    const waitlistedHackers = hackers.filter((h) => h.normalizedStatus === "waitlist");
+    if (waitlistedHackers.length === 0) {
+      setClearWaitlistError("No waitlisted hackers to clear.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `This will move ${waitlistedHackers.length} waitlisted hacker(s) back to "rejected" and reset the waitlist counter. Continue?`
+    );
+    if (!confirmed) return;
+
+    setClearingWaitlist(true);
+    setClearWaitlistError("");
+    setClearWaitlistSuccess("");
+
+    try {
+      for (const hacker of waitlistedHackers) {
+        await updateDoc(doc(db, HACKERS_COLLECTION, hacker.id), {
+          status: "rejected",
+          waitlistNumber: deleteField(),
+          waitlistedAt: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // Reset the scannerStats waitlist counter to 0
+      await setDoc(
+        doc(db, "scannerStats", "global"),
+        { waitlist: 0, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+
+      // Update local state
+      setHackers((prev) =>
+        prev.map((h) =>
+          h.normalizedStatus === "waitlist"
+            ? { ...h, status: "rejected", normalizedStatus: "rejected", waitlistNumber: 0, waitlistedAt: "Not available", waitlistedAtEpoch: 0 }
+            : h
+        )
+      );
+
+      setClearWaitlistSuccess(`Cleared ${waitlistedHackers.length} hacker(s) from the waitlist.`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to clear waitlist queue.";
+      setClearWaitlistError(message);
+    } finally {
+      setClearingWaitlist(false);
     }
   };
 
@@ -899,6 +953,27 @@ function AdminHackersPage() {
               </div>
               {waitlistRangeError && <div className="mt-3 text-sm text-red-300">{waitlistRangeError}</div>}
               {waitlistRangeSuccess && <div className="mt-3 text-sm text-green-300">{waitlistRangeSuccess}</div>}
+
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-300">Clear Waitlist Queue</h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Moves all waitlisted hackers back to rejected and resets the counter.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearWaitlistQueue}
+                    disabled={clearingWaitlist}
+                    className="rounded-xl px-4 py-2 bg-red-900/50 border border-red-500/30 text-red-200 font-semibold transition hover:bg-red-800/60 disabled:opacity-60"
+                  >
+                    {clearingWaitlist ? "Clearing..." : "Clear Queue"}
+                  </button>
+                </div>
+                {clearWaitlistError && <div className="mt-2 text-sm text-red-300">{clearWaitlistError}</div>}
+                {clearWaitlistSuccess && <div className="mt-2 text-sm text-green-300">{clearWaitlistSuccess}</div>}
+              </div>
             </div>
           )}
 
