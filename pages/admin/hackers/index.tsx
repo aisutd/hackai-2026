@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { FaChevronDown, FaChevronRight, FaSearch, FaUsers, FaAngleLeft, FaAngleRight } from "react-icons/fa";
-import { Timestamp, collection, deleteField, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { Timestamp, collection, deleteField, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import Navbar from "@/components/Navbar";
 import { auth, db } from "@/firebase/clientApp";
 import { isAdminEmail } from "@/utils/adminAccess";
@@ -574,8 +574,10 @@ function AdminHackersPage() {
       }
 
       // Reset the scannerStats waitlist counter to 0
+      const statsSnap = await getDocs(query(collection(db, "scannerStats"), limit(1)));
+      const statsDocId = statsSnap.empty ? "global" : statsSnap.docs[0].id;
       await setDoc(
-        doc(db, "scannerStats", "global"),
+        doc(db, "scannerStats", statsDocId),
         { waitlist: 0, updatedAt: serverTimestamp() },
         { merge: true }
       );

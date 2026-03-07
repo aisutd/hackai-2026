@@ -64,7 +64,7 @@ const HACKERS_COLLECTION = "hackers";
 const SCANNER_STATS_COLLECTION = "scannerStats";
 const SCANNER_RECORDS_COLLECTION = "scannerRecords";
 const SCANNER_STATS_DOC_ID = "global";
-const QR_SCAN_COOLDOWN_MS = 10000;
+const QR_SCAN_COOLDOWN_MS = 1500;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const normalizeStatus = (value: unknown): "accepted" | "rejected" | "waitlist" | "" => {
@@ -317,7 +317,7 @@ function ScannerPage() {
     return aliases.some((alias) => Boolean(data[alias]));
   }, []);
 
-  const setStatusWithHold = useCallback((next: ScanStatus, holdMs = 3000) => {
+  const setStatusWithHold = useCallback((next: ScanStatus, holdMs = 1500) => {
     setStatus(next);
     statusHoldUntilRef.current = Date.now() + holdMs;
   }, []);
@@ -688,7 +688,7 @@ function ScannerPage() {
         }
 
         const isSameAsLast =
-          rawValue === lastScanRef.current.value && nowMs - lastScanRef.current.at < 1500;
+          rawValue === lastScanRef.current.value && nowMs - lastScanRef.current.at < QR_SCAN_COOLDOWN_MS;
         if (!isSameAsLast) {
           lastScanRef.current = { value: rawValue, at: nowMs };
           recentQrScansRef.current[scanKey] = nowMs;
